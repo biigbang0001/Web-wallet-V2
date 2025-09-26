@@ -1,7 +1,7 @@
 // Wallet Management for NITO Wallet
 // Handles HD wallets, key generation, imports, and address management
 
-import { NITO_NETWORK, HD_CONFIG, SECURITY_CONFIG, ELEMENT_IDS } from './config.js';
+import { NITO_NETWORK, HD_CONFIG, SECURITY_CONFIG, ELEMENT_IDS, FEATURE_FLAGS } from './config.js';
 import { keyManager, validateInput, deriveFromCredentials, armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
@@ -40,6 +40,26 @@ async function getBitcoinLibraries() {
     bip39: window.bip39,
     bip32: window.bip32
   };
+}
+
+// === OPERATION TRACKING ===
+function isOperationActive(operationType = null) {
+  if (window.isOperationActive) {
+    return window.isOperationActive(operationType);
+  }
+  return false;
+}
+
+function startOperation(operationType) {
+  if (window.startOperation) {
+    window.startOperation(operationType);
+  }
+}
+
+function endOperation(operationType) {
+  if (window.endOperation) {
+    window.endOperation(operationType);
+  }
 }
 
 // === EXPLORER AND CONFIRMATION UTILITIES ===
@@ -241,7 +261,7 @@ async function showSuccessPopup(txid) {
   document.addEventListener('keydown', onKey);
 }
 
-// === TAPROOT UTILITIES ===
+// === ENHANCED TAPROOT UTILITIES ===
 export class TaprootUtils {
   static toXOnly(pubkey) {
     if (!pubkey || pubkey.length < 33) {
@@ -288,6 +308,29 @@ export class TaprootUtils {
       }
     };
   }
+
+  static async createTaprootAddress(publicKey, network) {
+    try {
+      if (!window.bitcoin || !window.bitcoin.payments) {
+        throw new Error('Bitcoin library not available');
+      }
+
+      const internalPubkey = TaprootUtils.toXOnly(publicKey);
+      const payment = window.bitcoin.payments.p2tr({ 
+        internalPubkey: internalPubkey, 
+        network: network 
+      });
+      
+      return {
+        address: payment.address,
+        output: payment.output,
+        internalPubkey: internalPubkey
+      };
+    } catch (error) {
+      console.error('Taproot address creation failed:', error);
+      throw error;
+    }
+  }
 }
 
 // === ADDRESS MANAGEMENT ===
@@ -324,7 +367,7 @@ class AddressManager {
   }
 }
 
-// === HD WALLET MANAGER ===
+// === ENHANCED HD WALLET MANAGER ===
 export class HDWalletManager {
   constructor() {
     this.hdWallet = null;
@@ -347,14 +390,24 @@ export class HDWalletManager {
   }
 
   async importHDWallet(seedOrXprv, passphrase = '') {
+    if (isOperationActive('wallet-import')) {
+      throw new Error('Wallet import already in progress');
+    }
+    
+    startOperation('wallet-import');
+    
     try {
       const { bitcoin, bip32, bip39 } = await getBitcoinLibraries();
       let seed;
       
+      console.log('[WALLET] Starting HD wallet import...');
+      
       if (seedOrXprv.startsWith('xprv')) {
+        console.log('[WALLET] Importing from XPRV...');
         this.hdWallet = bip32.fromBase58(seedOrXprv, NITO_NETWORK);
         this.currentMnemonic = null;
       } else {
+        console.log('[WALLET] Importing from mnemonic...');
         const mnemonic = seedOrXprv.trim();
         if (!bip39.validateMnemonic(mnemonic)) {
           throw new Error('Invalid mnemonic phrase');
@@ -365,8 +418,10 @@ export class HDWalletManager {
         this.currentMnemonic = mnemonic;
       }
 
+      console.log('[WALLET] Deriving addresses...');
       const addresses = this.deriveMainAddresses();
       
+      console.log('[WALLET] Storing secure keys...');
       await keyManager.storeKey('hdWallet', {
         masterKey: this.hdWallet.toBase58(),
         mnemonic: this.currentMnemonic
@@ -382,12 +437,31 @@ export class HDWalletManager {
           privateKey: addresses.taprootKeyPair.privateKey.toString('hex'),
           publicKey: addresses.taprootPublicKey.toString('hex')
         });
+        console.log('[WALLET] Taproot keypair stored successfully');
       }
 
+      // Log des adresses si activé
+      if (FEATURE_FLAGS.LOG_ADDRESSES) {
+        this.logAddresses(addresses);
+      }
+
+      console.log('[WALLET] HD wallet import completed successfully');
       return addresses;
     } catch (error) {
+      console.error('[WALLET] HD wallet import failed:', error);
       throw new Error(`HD wallet import failed: ${error.message}`);
+    } finally {
+      endOperation('wallet-import');
     }
+  }
+
+  logAddresses(addresses) {
+    console.log('=================== WALLET ADDRESSES ===================');
+    console.log('Legacy (P2PKH)  :', addresses.legacy);
+    console.log('P2SH (Wrapped)  :', addresses.p2sh);
+    console.log('Bech32 (Native) :', addresses.bech32);
+    console.log('Bech32m (Taproot):', addresses.taproot);
+    console.log('========================================================');
   }
 
   deriveMainAddresses() {
@@ -401,6 +475,7 @@ export class HDWalletManager {
         throw new Error('Bitcoin libraries not available');
       }
 
+      console.log('[WALLET] Deriving address nodes...');
       const bech32Node = this.hdWallet.derivePath(HD_CONFIG.DERIVATION_PATHS.bech32 + "/0/0");
       const legacyNode = this.hdWallet.derivePath(HD_CONFIG.DERIVATION_PATHS.legacy + "/0/0");
       const p2shNode = this.hdWallet.derivePath(HD_CONFIG.DERIVATION_PATHS.p2sh + "/0/0");
@@ -409,16 +484,21 @@ export class HDWalletManager {
       const pubkey = Buffer.from(bech32Node.publicKey);
       const keyPair = ECPair.fromPrivateKey(bech32Node.privateKey, { network: NITO_NETWORK });
 
+      console.log('[WALLET] Creating payment objects...');
+      
+      // Legacy P2PKH
       const p2pkh = bitcoin.payments.p2pkh({ 
         pubkey: Buffer.from(legacyNode.publicKey), 
         network: NITO_NETWORK 
       });
       
+      // Native Bech32 P2WPKH
       const p2wpkh = bitcoin.payments.p2wpkh({ 
         pubkey: pubkey, 
         network: NITO_NETWORK 
       });
       
+      // P2SH wrapped SegWit
       const p2sh = bitcoin.payments.p2sh({
         redeem: bitcoin.payments.p2wpkh({ 
           pubkey: Buffer.from(p2shNode.publicKey), 
@@ -427,6 +507,8 @@ export class HDWalletManager {
         network: NITO_NETWORK
       });
 
+      // Taproot P2TR (Bech32m)
+      console.log('[WALLET] Creating Taproot address...');
       const tapInternalPubkey = TaprootUtils.toXOnly(taprootNode.publicKey);
       const p2tr = bitcoin.payments.p2tr({ 
         internalPubkey: tapInternalPubkey, 
@@ -434,7 +516,9 @@ export class HDWalletManager {
       });
       const taprootKeyPair = ECPair.fromPrivateKey(taprootNode.privateKey, { network: NITO_NETWORK });
 
-      return {
+      console.log('[WALLET] Address derivation completed');
+
+      const result = {
         legacy: p2pkh.address,
         p2sh: p2sh.address,
         bech32: p2wpkh.address,
@@ -446,7 +530,17 @@ export class HDWalletManager {
         hdMasterKey: this.hdWallet.toBase58(),
         mnemonic: this.currentMnemonic
       };
+
+      // Vérifications de validité
+      if (!result.taproot || !result.taproot.startsWith('nito1p')) {
+        console.warn('[WALLET] Invalid Taproot address generated:', result.taproot);
+      } else {
+        console.log('[WALLET] Valid Taproot address generated:', result.taproot);
+      }
+
+      return result;
     } catch (error) {
+      console.error('[WALLET] Address derivation failed:', error);
       throw new Error(`Failed to derive addresses: ${error.message}`);
     }
   }
@@ -499,6 +593,7 @@ export class HDWalletManager {
   }
 
   async scanHdUtxosForFamily(family) {
+    console.log(`[UTXO_SCAN] Scanning ${family} family for HD wallet...`);
     const allUtxos = [];
     const seen = new Set();
 
@@ -511,6 +606,7 @@ export class HDWalletManager {
       try {
         scan = await window.rpc('scantxoutset', ['start', descriptors]);
       } catch (e) {
+        console.warn(`[UTXO_SCAN] Error scanning chunk ${chunk} for ${family}:`, e);
         break;
       }
       
@@ -543,6 +639,7 @@ export class HDWalletManager {
       }
     }
 
+    console.log(`[UTXO_SCAN] Found ${allUtxos.length} UTXOs for ${family} family`);
     return allUtxos;
   }
 
@@ -621,13 +718,17 @@ export class HDWalletManager {
   }
 
   async utxosAllForBech32() {
+    console.log('[UTXO_SCAN] Scanning all families for Bech32 cumulative balance...');
     const families = ['bech32', 'p2sh', 'legacy'];
     const parts = [];
     
     for (const fam of families) {
       try { 
-        parts.push(await this.scanHdUtxosForFamily(fam)); 
+        const familyUtxos = await this.scanHdUtxosForFamily(fam); 
+        parts.push(familyUtxos);
+        console.log(`[UTXO_SCAN] ${fam}: ${familyUtxos.length} UTXOs`);
       } catch (e) {
+        console.warn(`[UTXO_SCAN] Failed to scan ${fam}:`, e);
         parts.push([]);
       }
     }
@@ -642,7 +743,14 @@ export class HDWalletManager {
         merged.push(u);
       }
     }
+    
+    console.log(`[UTXO_SCAN] Total merged UTXOs: ${merged.length}`);
     return merged;
+  }
+
+  async utxosForTaproot() {
+    console.log('[UTXO_SCAN] Scanning Taproot UTXOs specifically...');
+    return await this.scanHdUtxosForFamily('taproot');
   }
 }
 
@@ -743,6 +851,7 @@ class WalletState {
       const { ECPair } = await getBitcoinLibraries();
       return ECPair.fromPrivateKey(Buffer.from(keyData.privateKey, 'hex'), { network: NITO_NETWORK });
     } catch (error) {
+      console.warn('[WALLET] Failed to get Taproot keypair:', error);
       return null;
     }
   }
@@ -753,30 +862,47 @@ class WalletState {
       if (!keyData) return null;
       return Buffer.from(keyData.publicKey, 'hex');
     } catch (error) {
+      console.warn('[WALLET] Failed to get Taproot public key:', error);
       return null;
     }
   }
 
   async updateBalance() {
+    if (isOperationActive('balance-update')) {
+      console.log('[BALANCE] Update already in progress');
+      return this.totalBalance;
+    }
+    
+    startOperation('balance-update');
+    
     try {
       let total = 0;
       
       if (window.balance) {
+        console.log('[BALANCE] Updating wallet balances...');
+        
         if (this.bech32Address) {
           const bech32Balance = await window.balance(this.bech32Address, this.importType === 'hd', this.importType === 'hd' ? hdManager.hdWallet : null);
           total += bech32Balance || 0;
+          console.log(`[BALANCE] Bech32 balance: ${bech32Balance} NITO`);
         }
         
         if (this.taprootAddress && this.importType === 'hd') {
           const taprootBalance = await window.balance(this.taprootAddress, true, hdManager.hdWallet);
           total += taprootBalance || 0;
+          console.log(`[BALANCE] Taproot balance: ${taprootBalance} NITO`);
         }
+        
+        console.log(`[BALANCE] Total balance: ${total} NITO`);
       }
       
       this.totalBalance = total;
       return total;
     } catch (error) {
-      return 0;
+      console.error('[BALANCE] Update error:', error);
+      return this.totalBalance;
+    } finally {
+      endOperation('balance-update');
     }
   }
 }
@@ -840,10 +966,20 @@ export async function importWIF(wif) {
     const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: pubkeyBuffer, network: NITO_NETWORK });
     const p2sh = bitcoin.payments.p2sh({ redeem: p2wpkh, network: NITO_NETWORK });
     
+    // Generate taproot address for single key import too
+    let taprootAddress = '';
+    try {
+      const taprootPayment = await TaprootUtils.createTaprootAddress(pubkeyBuffer, NITO_NETWORK);
+      taprootAddress = taprootPayment.address;
+    } catch (error) {
+      console.warn('[WALLET] Could not generate taproot address for single key:', error);
+    }
+    
     return {
       legacy: p2pkh.address,
       p2sh: p2sh.address,
       bech32: p2wpkh.address,
+      taproot: taprootAddress,
       keyPair: kp,
       publicKey: pubkeyBuffer
     };
@@ -875,10 +1011,20 @@ export async function importHex(hex) {
     const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: pubkeyBuffer, network: NITO_NETWORK });
     const p2sh = bitcoin.payments.p2sh({ redeem: p2wpkh, network: NITO_NETWORK });
     
+    // Generate taproot address for single key import too
+    let taprootAddress = '';
+    try {
+      const taprootPayment = await TaprootUtils.createTaprootAddress(pubkeyBuffer, NITO_NETWORK);
+      taprootAddress = taprootPayment.address;
+    } catch (error) {
+      console.warn('[WALLET] Could not generate taproot address for single key:', error);
+    }
+    
     return {
       legacy: p2pkh.address,
       p2sh: p2sh.address,
       bech32: p2wpkh.address,
+      taproot: taprootAddress,
       keyPair: kp,
       publicKey: pubkeyBuffer
     };
@@ -934,6 +1080,7 @@ export async function importWallet(arg1, arg2) {
       let addresses;
       
       if (validateInput(input, 'xprv')) {
+        console.log('[WALLET] Importing XPRV...');
         addresses = await hdManager.importHDWallet(input);
         walletState.importType = 'hd';
         
@@ -950,6 +1097,7 @@ export async function importWallet(arg1, arg2) {
         }
         
       } else if (validateInput(input, 'mnemonic')) {
+        console.log('[WALLET] Importing mnemonic...');
         addresses = await hdManager.importHDWallet(input);
         walletState.importType = 'hd';
         
@@ -966,6 +1114,7 @@ export async function importWallet(arg1, arg2) {
         }
         
       } else if (validateInput(input, 'wif')) {
+        console.log('[WALLET] Importing WIF...');
         addresses = await importWIF(input);
         walletState.importType = 'single';
         
@@ -974,7 +1123,16 @@ export async function importWallet(arg1, arg2) {
           publicKey: addresses.publicKey.toString('hex')
         });
         
+        // For single key, also try to store a basic taproot keypair if available
+        if (addresses.taproot) {
+          await keyManager.storeKey('taprootKeyPair', {
+            privateKey: addresses.keyPair.privateKey.toString('hex'),
+            publicKey: addresses.publicKey.toString('hex')
+          });
+        }
+        
       } else if (validateInput(input, 'hex')) {
+        console.log('[WALLET] Importing hex private key...');
         addresses = await importHex(input);
         walletState.importType = 'single';
         
@@ -982,6 +1140,14 @@ export async function importWallet(arg1, arg2) {
           privateKey: addresses.keyPair.privateKey.toString('hex'),
           publicKey: addresses.publicKey.toString('hex')
         });
+        
+        // For single key, also try to store a basic taproot keypair if available
+        if (addresses.taproot) {
+          await keyManager.storeKey('taprootKeyPair', {
+            privateKey: addresses.keyPair.privateKey.toString('hex'),
+            publicKey: addresses.publicKey.toString('hex')
+          });
+        }
         
       } else {
         throw new Error('Unsupported input format');
@@ -1009,6 +1175,7 @@ export async function importWallet(arg1, arg2) {
       };
     }
   } catch (error) {
+    console.error('[WALLET] Import failed:', error);
     return { 
       success: false, 
       error: error.message || String(error) 
@@ -1016,19 +1183,32 @@ export async function importWallet(arg1, arg2) {
   }
 }
 
-// === UTXO AND BALANCE FUNCTIONS ===
+// === ENHANCED UTXO AND BALANCE FUNCTIONS ===
 export async function utxos(addr, isHD = false, hdWallet = null) {
+  if (isOperationActive('utxo-scan')) {
+    console.log('[UTXO] Scan already in progress');
+    return [];
+  }
+  
+  startOperation('utxo-scan');
+  
   try {
+    console.log(`[UTXO] Scanning UTXOs for address: ${addr}, HD: ${isHD}`);
+    
     if (isHD && hdWallet) {
       const addressType = AddressManager.getAddressType(addr);
+      console.log(`[UTXO] Address type detected: ${addressType}`);
       
       if (addressType === 'p2wpkh') {
+        console.log('[UTXO] Cumulative scan for Bech32 (all legacy families)');
         return await hdManager.utxosAllForBech32();
       } else if (addressType === 'p2tr') {
-        return await hdManager.scanHdUtxosForFamily('taproot');
+        console.log('[UTXO] Taproot-specific scan');
+        return await hdManager.utxosForTaproot();
       }
     }
     
+    console.log('[UTXO] Single address scan fallback');
     const scan = await window.rpc('scantxoutset', ['start', [`addr(${addr})`]]);
     if (!scan.success || !scan.unspents) return [];
     
@@ -1045,33 +1225,54 @@ export async function utxos(addr, isHD = false, hdWallet = null) {
   
     return validUtxos;
   } catch (error) {
+    console.error('[UTXO] Scan error:', error);
     throw error;
+  } finally {
+    endOperation('utxo-scan');
   }
 }
 
 export async function balance(addr, isHD = false, hdWallet = null) {
   // Check if refresh is blocked during confirmation
   if (_refreshBlocked) {
-    console.log('Balance refresh blocked during transaction confirmation');
+    console.log('[BALANCE] Refresh blocked during transaction confirmation');
     return 0;
   }
 
   try {
+    console.log(`[BALANCE] Calculating balance for: ${addr}, HD: ${isHD}`);
+    
     if (isHD && hdWallet) {
       const addressType = AddressManager.getAddressType(addr);
+      console.log(`[BALANCE] HD address type: ${addressType}`);
       
       if (addressType === 'p2wpkh') {
+        console.log('[BALANCE] Cumulative balance calculation');
         const utxoList = await hdManager.utxosAllForBech32();
-        return utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
+        const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
+        console.log(`[BALANCE] Cumulative balance: ${total} NITO`);
+        return total;
+      } else if (addressType === 'p2tr') {
+        console.log('[BALANCE] Taproot balance calculation');
+        const utxoList = await hdManager.utxosForTaproot();
+        const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
+        console.log(`[BALANCE] Taproot balance: ${total} NITO`);
+        return total;
       } else {
         const utxoList = await utxos(addr, true, hdWallet);
-        return utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
+        const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
+        console.log(`[BALANCE] Standard balance: ${total} NITO`);
+        return total;
       }
     } else {
+      console.log('[BALANCE] Single address balance calculation');
       const scan = await window.rpc('scantxoutset', ['start', [`addr(${addr})`]]);
-      return (scan && scan.total_amount) || 0;
+      const balance = (scan && scan.total_amount) || 0;
+      console.log(`[BALANCE] Single address balance: ${balance} NITO`);
+      return balance;
     }
   } catch (error) {
+    console.error('[BALANCE] Calculation error:', error);
     throw new Error(`Failed to fetch balance: ${error.message}`);
   }
 }
@@ -1156,6 +1357,19 @@ export function syncGlobalState() {
     window.importType = walletState.importType;
     window.consolidateButtonInjected = walletState.consolidateButtonInjected;
     window.hdManager = hdManager;
+    
+    console.log('[WALLET] Global state synchronized');
+    
+    // Log des adresses si le feature flag est activé
+    if (FEATURE_FLAGS.LOG_ADDRESSES && walletState.isReady()) {
+      console.log('=== CURRENT WALLET STATE ===');
+      console.log('Legacy   :', walletState.legacyAddress);
+      console.log('P2SH     :', walletState.p2shAddress);
+      console.log('Bech32   :', walletState.bech32Address);
+      console.log('Bech32m  :', walletState.taprootAddress);
+      console.log('Type     :', walletState.importType);
+      console.log('============================');
+    }
   }
 }
 
@@ -1195,4 +1409,4 @@ if (typeof window !== 'undefined') {
   window.consolidateButtonInjected = false;
 }
 
-console.log('Wallet module loaded');
+console.log('Wallet module loaded - Version 2.0.0');
