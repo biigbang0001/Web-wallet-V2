@@ -1,0 +1,126 @@
+{
+  "languages": {
+    "fr": "Französisch",
+    "en": "Englisch",
+    "de": "Deutsch",
+    "es": "Spanisch",
+    "nl": "Niederländisch",
+    "ru": "Russisch",
+    "zh": "Chinesisch"
+  },
+  "title": "Wallet NITO",
+  "language_label": "Sprache:",
+  "counter": {
+    "keys_generated": "🔑 Nito-Schlüssel generiert:"
+  },
+  "generate_section": {
+    "title": "🎯 Nito-Privatschlüssel generieren",
+    "generate_button": "🎲 Generieren",
+    "copy": "📋 Kopieren",
+    "reveal": "👁️ Anzeigen",
+    "warning": "⚠️ Speichern Sie den privaten Schlüssel sofort! Er wird nach 10 Minuten Inaktivität oder nach einem Neuladen der Seite gelöscht."
+  },
+  "import_section": {
+    "title": "📥 Wallet importieren",
+    "import_button": "📥 Importieren",
+    "refresh_button": "🔄 Aktualisieren",
+    "balance": "Kontostand:"
+  },
+  "send_section": {
+    "title": "📤 NITO senden",
+    "destination_placeholder": "Empfängeradresse",
+    "amount_placeholder": "Betrag (NITO)",
+    "fee_placeholder": "Gebühr (NITO)",
+    "debit_label": "Abzuziehende Adresse:",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔍 Vorbereiten",
+    "broadcast_button": "✅ Transaktion senden",
+    "cancel_button": "❌ Abbrechen",
+    "signed_tx": "Signierte Transaktion (hex):",
+    "copy_tx": "📋 Kopieren"
+  },
+  "encrypted_messaging": {
+    "title": "🔐 Verschlüsselte Nachrichten",
+    "publish_pubkey": "📢 Meinen öffentlichen Schlüssel veröffentlichen",
+    "publish_info": "Veröffentlichen Sie Ihren öffentlichen Schlüssel einmal, damit andere Ihnen verschlüsselte Nachrichten senden können.",
+    "write_title": "✏️ Nachricht schreiben",
+    "message_placeholder": "Ihre Nachricht (max. 50000 Zeichen)",
+    "send_button": "📤 Senden",
+    "clear_button": "🗑️ Löschen",
+    "read_title": "📬 Nachrichten lesen",
+    "refresh_messages": "🔄 Nachrichten aktualisieren",
+    "unread_messages": "ungelesene Nachrichten",
+    "validate_button": "✅ Senden bestätigen",
+    "cancel_button": "❌ Abbrechen",
+    "recipient_placeholder": "Bech32-Adresse des Empfängers (nito1...)"
+  },
+  "messaging_estimated_cost": "Geschätzte Kosten: 0.0001 NITO (1 Transaktion)",
+  "messaging_recipient_title": "📧 Nachrichtenempfänger",
+  "footer": {
+    "open_source": "Dieses Projekt ist Open Source",
+    "view_code": "Code auf GitHub ansehen",
+    "official_site": "Offizielle NITO-Seite"
+  },
+  "max_button": {
+    "text": "MAX"
+  },
+  "chat": {
+    "copy_seed": "📑 Mnemonische Phrase kopieren"
+  },
+  "errors": {
+    "initialization_failed": "Anwendungsinitialisierung fehlgeschlagen. Bitte Seite neu laden.",
+    "import_first": "Importieren Sie zuerst ein Wallet.",
+    "enter_key": "Bitte geben Sie einen privaten Schlüssel, eine Mnemonik oder XPRV ein",
+    "import_failed": "Import fehlgeschlagen",
+    "import_error": "Importfehler",
+    "enter_email_password": "Bitte E-Mail und Passwort eingeben",
+    "connection_failed": "Verbindung fehlgeschlagen",
+    "connection_error": "Verbindungsfehler",
+    "generation_failed": "Fehler bei der Generierung",
+    "fill_destination_amount": "Bitte Zieladresse und Betrag ausfüllen",
+    "transaction_functions_unavailable": "Transaktionsfunktionen nicht verfügbar",
+    "amount_too_high": "Betrag zu hoch",
+    "transaction_prep_failed": "Vorbereitung der Transaktion fehlgeschlagen",
+    "no_transaction": "Keine Transaktion zum Senden",
+    "rpc_unavailable": "RPC-Funktion nicht verfügbar",
+    "broadcast_failed": "Senden fehlgeschlagen",
+    "consolidation_unavailable": "Konsolidierungsfunktion nicht verfügbar"
+  },
+  "consolidate": {
+    "cta": "UTXOs konsolidieren",
+    "run": "Konsolidierung starten"
+  },
+  "common": {
+    "cancel": "Abbrechen"
+  },
+  "loading": {
+    "connecting": "Verbindung wird hergestellt...",
+    "wallet_setup": "Wallet wird eingerichtet...",
+    "refreshing": "⏛ Aktualisierung...",
+    "importing_wallet": "Wallet wird importiert...",
+    "connecting_email": "Verbindung per E-Mail...",
+    "balance_refresh": "Kontostand wird aktualisiert…",
+    "blockchain_scan": "Blockchain-Scan läuft...",
+    "cache_clearing": "Cache wird geleert...",
+    "utxo_scan": "UTXOs werden analysiert...",
+    "balance_updated": "✅ Kontostand aktualisiert!",
+    "update_error": "❌ Aktualisierungsfehler"
+  },
+  "popup": {
+    "success_message": "Transaktion erfolgreich gesendet!",
+    "confirmation_progress": "Bestätigung:",
+    "transaction_id": "Transaktions-ID:",
+    "close_button": "Schließen",
+    "confirming": "Bestätigen...",
+    "transaction_success": "Transaktion erfolgreich! TXID:"
+  },
+  "seed_reveal": {
+    "button_reveal": "🔓 Mnemonische Phrase anzeigen",
+    "warning_title": "⚠️ Mnemonische Phrase (24 Wörter):",
+    "copy_button": "📋 Kopieren",
+    "timeout_warning": "Diese Phrase wird in 30 Sekunden automatisch ausgeblendet",
+    "button_hide": "🔒 Phrase verbergen",
+    "copy_success": "Mnemonische Phrase in die Zwischenablage kopiert!",
+    "copy_fallback": "Mnemonische Phrase kopiert!"
+  }
+}

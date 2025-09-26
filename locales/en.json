@@ -1,0 +1,126 @@
+{
+  "languages": {
+    "fr": "French",
+    "en": "English",
+    "de": "German",
+    "es": "Spanish",
+    "nl": "Dutch",
+    "ru": "Russian",
+    "zh": "Chinese"
+  },
+  "title": "Wallet NITO",
+  "language_label": "Language:",
+  "counter": {
+    "keys_generated": "🔑 Nito keys generated:"
+  },
+  "generate_section": {
+    "title": "🎯 Nito Private Key Generation",
+    "generate_button": "🎲 Generate",
+    "copy": "📋 Copy",
+    "reveal": "👁️ Reveal",
+    "warning": "⚠️ Save the private key immediately! It will be erased after 10 minutes of inactivity or after reloading the page."
+  },
+  "import_section": {
+    "title": "📥 Import a Wallet",
+    "import_button": "📥 Import",
+    "refresh_button": "🔄 Refresh",
+    "balance": "Balance:"
+  },
+  "send_section": {
+    "title": "📤 Send NITO",
+    "destination_placeholder": "Recipient address",
+    "amount_placeholder": "Amount (NITO)",
+    "fee_placeholder": "Fee (NITO)",
+    "debit_label": "Debit address:",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔍 Prepare",
+    "broadcast_button": "✅ Broadcast transaction",
+    "cancel_button": "❌ Cancel",
+    "signed_tx": "Signed transaction (hex):",
+    "copy_tx": "📋 Copy"
+  },
+  "encrypted_messaging": {
+    "title": "🔐 Encrypted Messaging",
+    "publish_pubkey": "📢 Publish my public key",
+    "publish_info": "Publish your public key once to allow others to send you encrypted messages.",
+    "write_title": "✏️ Write a message",
+    "message_placeholder": "Your message (max 50000 characters)",
+    "send_button": "📤 Send",
+    "clear_button": "🗑️ Clear",
+    "read_title": "📬 Read messages",
+    "refresh_messages": "🔄 Refresh messages",
+    "unread_messages": "unread messages",
+    "validate_button": "✅ Confirm send",
+    "cancel_button": "❌ Cancel",
+    "recipient_placeholder": "Recipient's bech32 address (nito1...)"
+  },
+  "messaging_estimated_cost": "Estimated cost: 0.0001 NITO (1 transaction)",
+  "messaging_recipient_title": "📧 Message recipient",
+  "footer": {
+    "open_source": "This project is open source",
+    "view_code": "View code on GitHub",
+    "official_site": "Official NITO site"
+  },
+  "max_button": {
+    "text": "MAX"
+  },
+  "chat": {
+    "copy_seed": "📑 Copy mnemonic phrase"
+  },
+  "errors": {
+    "initialization_failed": "Application initialization failed. Please refresh the page.",
+    "import_first": "Import a wallet first.",
+    "enter_key": "Please enter a private key, mnemonic, or XPRV",
+    "import_failed": "Import failed",
+    "import_error": "Import error",
+    "enter_email_password": "Please enter email and password",
+    "connection_failed": "Connection failed",
+    "connection_error": "Connection error",
+    "generation_failed": "Generation error",
+    "fill_destination_amount": "Please fill in the destination address and amount",
+    "transaction_functions_unavailable": "Transaction functions unavailable",
+    "amount_too_high": "Amount too high",
+    "transaction_prep_failed": "Transaction preparation failed",
+    "no_transaction": "No transaction to broadcast",
+    "rpc_unavailable": "RPC function unavailable",
+    "broadcast_failed": "Broadcast failed",
+    "consolidation_unavailable": "Consolidation function unavailable"
+  },
+  "consolidate": {
+    "cta": "Consolidate UTXOs",
+    "run": "Run consolidation"
+  },
+  "common": {
+    "cancel": "Cancel"
+  },
+  "loading": {
+    "connecting": "Connecting...",
+    "wallet_setup": "Setting up wallet...",
+    "refreshing": "⏛ Refreshing...",
+    "importing_wallet": "Importing wallet...",
+    "connecting_email": "Connecting via email...",
+    "balance_refresh": "Refreshing balance…",
+    "blockchain_scan": "Scanning blockchain...",
+    "cache_clearing": "Clearing cache...",
+    "utxo_scan": "Scanning UTXOs...",
+    "balance_updated": "✅ Balance updated!",
+    "update_error": "❌ Update error"
+  },
+  "popup": {
+    "success_message": "Transaction successfully sent!",
+    "confirmation_progress": "Confirmation:",
+    "transaction_id": "Transaction ID:",
+    "close_button": "Close",
+    "confirming": "Confirming...",
+    "transaction_success": "Transaction successful! TXID:"
+  },
+  "seed_reveal": {
+    "button_reveal": "🔓 Reveal mnemonic phrase",
+    "warning_title": "⚠️ Mnemonic phrase (24 words):",
+    "copy_button": "📋 Copy",
+    "timeout_warning": "This phrase will be automatically hidden in 30 seconds",
+    "button_hide": "🔒 Hide phrase",
+    "copy_success": "Mnemonic phrase copied to clipboard!",
+    "copy_fallback": "Mnemonic phrase copied!"
+  }
+}

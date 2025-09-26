@@ -1,0 +1,126 @@
+{
+  "languages": {
+    "fr": "Francés",
+    "en": "Inglés",
+    "de": "Alemán",
+    "es": "Español",
+    "nl": "Neerlandés",
+    "ru": "Ruso",
+    "zh": "Chino"
+  },
+  "title": "Wallet NITO",
+  "language_label": "Idioma:",
+  "counter": {
+    "keys_generated": "🔑 Claves Nito generadas:"
+  },
+  "generate_section": {
+    "title": "🎯 Generación de clave privada Nito",
+    "generate_button": "🎲 Generar",
+    "copy": "📋 Copiar",
+    "reveal": "👁️ Revelar",
+    "warning": "⚠️ ¡Guarde la clave privada inmediatamente! Se borrará después de 10 minutos de inactividad o al recargar la página."
+  },
+  "import_section": {
+    "title": "📥 Importar un monedero",
+    "import_button": "📥 Importar",
+    "refresh_button": "🔄 Actualizar",
+    "balance": "Saldo:"
+  },
+  "send_section": {
+    "title": "📤 Enviar NITO",
+    "destination_placeholder": "Dirección del destinatario",
+    "amount_placeholder": "Cantidad (NITO)",
+    "fee_placeholder": "Comisión (NITO)",
+    "debit_label": "Dirección a debitar:",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔍 Preparar",
+    "broadcast_button": "✅ Difundir transacción",
+    "cancel_button": "❌ Cancelar",
+    "signed_tx": "Transacción firmada (hex):",
+    "copy_tx": "📋 Copiar"
+  },
+  "encrypted_messaging": {
+    "title": "🔐 Mensajería cifrada",
+    "publish_pubkey": "📢 Publicar mi clave pública",
+    "publish_info": "Publique su clave pública una vez para permitir que otros le envíen mensajes cifrados.",
+    "write_title": "✏️ Escribir un mensaje",
+    "message_placeholder": "Su mensaje (máx. 50000 caracteres)",
+    "send_button": "📤 Enviar",
+    "clear_button": "🗑️ Borrar",
+    "read_title": "📬 Leer mensajes",
+    "refresh_messages": "🔄 Actualizar mensajes",
+    "unread_messages": "mensajes no leídos",
+    "validate_button": "✅ Confirmar envío",
+    "cancel_button": "❌ Cancelar",
+    "recipient_placeholder": "Dirección bech32 del destinatario (nito1...)"
+  },
+  "messaging_estimated_cost": "Costo estimado: 0.0001 NITO (1 transacción)",
+  "messaging_recipient_title": "📧 Destinatario del mensaje",
+  "footer": {
+    "open_source": "Este proyecto es de código abierto",
+    "view_code": "Ver código en GitHub",
+    "official_site": "Sitio oficial de NITO"
+  },
+  "max_button": {
+    "text": "MAX"
+  },
+  "chat": {
+    "copy_seed": "📑 Copiar frase mnemotécnica"
+  },
+  "errors": {
+    "initialization_failed": "Error en la inicialización de la aplicación. Por favor recargue la página.",
+    "import_first": "Primero importe un monedero.",
+    "enter_key": "Ingrese una clave privada, frase mnemotécnica o XPRV",
+    "import_failed": "Error en la importación",
+    "import_error": "Error de importación",
+    "enter_email_password": "Ingrese el correo electrónico y la contraseña",
+    "connection_failed": "Error de conexión",
+    "connection_error": "Error de conexión",
+    "generation_failed": "Error en la generación",
+    "fill_destination_amount": "Ingrese la dirección de destino y la cantidad",
+    "transaction_functions_unavailable": "Funciones de transacción no disponibles",
+    "amount_too_high": "Cantidad demasiado alta",
+    "transaction_prep_failed": "Error al preparar la transacción",
+    "no_transaction": "No hay transacción para difundir",
+    "rpc_unavailable": "Función RPC no disponible",
+    "broadcast_failed": "Error al difundir",
+    "consolidation_unavailable": "Función de consolidación no disponible"
+  },
+  "consolidate": {
+    "cta": "Consolidar UTXOs",
+    "run": "Ejecutar consolidación"
+  },
+  "common": {
+    "cancel": "Cancelar"
+  },
+  "loading": {
+    "connecting": "Conectando...",
+    "wallet_setup": "Configurando monedero...",
+    "refreshing": "⏛ Actualizando...",
+    "importing_wallet": "Importando monedero...",
+    "connecting_email": "Conectando por correo...",
+    "balance_refresh": "Actualizando saldo…",
+    "blockchain_scan": "Escaneando blockchain...",
+    "cache_clearing": "Limpiando caché...",
+    "utxo_scan": "Analizando UTXOs...",
+    "balance_updated": "✅ ¡Saldo actualizado!",
+    "update_error": "❌ Error de actualización"
+  },
+  "popup": {
+    "success_message": "¡Transacción enviada con éxito!",
+    "confirmation_progress": "Confirmación:",
+    "transaction_id": "ID de transacción:",
+    "close_button": "Cerrar",
+    "confirming": "Confirmando...",
+    "transaction_success": "¡Transacción exitosa! TXID:"
+  },
+  "seed_reveal": {
+    "button_reveal": "🔓 Revelar frase mnemotécnica",
+    "warning_title": "⚠️ Frase mnemotécnica (24 palabras):",
+    "copy_button": "📋 Copiar",
+    "timeout_warning": "Esta frase se ocultará automáticamente en 30 segundos",
+    "button_hide": "🔒 Ocultar frase",
+    "copy_success": "¡Frase mnemotécnica copiada al portapapeles!",
+    "copy_fallback": "¡Frase mnemotécnica copiada!"
+  }
+}

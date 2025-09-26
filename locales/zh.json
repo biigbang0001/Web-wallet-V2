@@ -1,0 +1,126 @@
+{
+  "languages": {
+    "fr": "法语",
+    "en": "英语",
+    "de": "德语",
+    "es": "西班牙语",
+    "nl": "荷兰语",
+    "ru": "俄语",
+    "zh": "中文"
+  },
+  "title": "NITO 钱包",
+  "language_label": "语言：",
+  "counter": {
+    "keys_generated": "🔑 已生成的 Nito 密钥："
+  },
+  "generate_section": {
+    "title": "🎯 生成 Nito 私钥",
+    "generate_button": "🎲 生成",
+    "copy": "📋 复制",
+    "reveal": "👁️ 显示",
+    "warning": "⚠️ 请立即保存私钥！它将在 10 分钟无操作或刷新页面后被删除。"
+  },
+  "import_section": {
+    "title": "📥 导入钱包",
+    "import_button": "📥 导入",
+    "refresh_button": "🔄 刷新",
+    "balance": "余额："
+  },
+  "send_section": {
+    "title": "📤 发送 NITO",
+    "destination_placeholder": "接收地址",
+    "amount_placeholder": "金额 (NITO)",
+    "fee_placeholder": "手续费 (NITO)",
+    "debit_label": "扣款地址：",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔍 准备",
+    "broadcast_button": "✅ 广播交易",
+    "cancel_button": "❌ 取消",
+    "signed_tx": "已签名交易 (hex)：",
+    "copy_tx": "📋 复制"
+  },
+  "encrypted_messaging": {
+    "title": "🔐 加密消息",
+    "publish_pubkey": "📢 发布我的公钥",
+    "publish_info": "只需发布一次公钥即可让他人向您发送加密消息。",
+    "write_title": "✏️ 写消息",
+    "message_placeholder": "您的消息 (最多 50000 字符)",
+    "send_button": "📤 发送",
+    "clear_button": "🗑️ 清除",
+    "read_title": "📬 读取消息",
+    "refresh_messages": "🔄 刷新消息",
+    "unread_messages": "未读消息",
+    "validate_button": "✅ 确认发送",
+    "cancel_button": "❌ 取消",
+    "recipient_placeholder": "接收方 Bech32 地址 (nito1...)"
+  },
+  "messaging_estimated_cost": "预计费用: 0.0001 NITO (1 笔交易)",
+  "messaging_recipient_title": "📧 消息接收人",
+  "footer": {
+    "open_source": "该项目为开源项目",
+    "view_code": "在 GitHub 查看代码",
+    "official_site": "NITO 官方网站"
+  },
+  "max_button": {
+    "text": "MAX"
+  },
+  "chat": {
+    "copy_seed": "📑 复制助记词"
+  },
+  "errors": {
+    "initialization_failed": "应用初始化失败。请刷新页面。",
+    "import_first": "请先导入钱包。",
+    "enter_key": "请输入私钥、助记词或 XPRV",
+    "import_failed": "导入失败",
+    "import_error": "导入错误",
+    "enter_email_password": "请输入邮箱和密码",
+    "connection_failed": "连接失败",
+    "connection_error": "连接错误",
+    "generation_failed": "生成错误",
+    "fill_destination_amount": "请输入接收地址和金额",
+    "transaction_functions_unavailable": "交易功能不可用",
+    "amount_too_high": "金额过高",
+    "transaction_prep_failed": "交易准备失败",
+    "no_transaction": "没有可广播的交易",
+    "rpc_unavailable": "RPC 功能不可用",
+    "broadcast_failed": "广播失败",
+    "consolidation_unavailable": "合并功能不可用"
+  },
+  "consolidate": {
+    "cta": "合并 UTXO",
+    "run": "执行合并"
+  },
+  "common": {
+    "cancel": "取消"
+  },
+  "loading": {
+    "connecting": "正在连接...",
+    "wallet_setup": "正在配置钱包...",
+    "refreshing": "⏛ 正在刷新...",
+    "importing_wallet": "正在导入钱包...",
+    "connecting_email": "通过邮箱连接...",
+    "balance_refresh": "正在刷新余额…",
+    "blockchain_scan": "正在扫描区块链...",
+    "cache_clearing": "正在清除缓存...",
+    "utxo_scan": "正在分析 UTXO...",
+    "balance_updated": "✅ 余额已更新！",
+    "update_error": "❌ 更新错误"
+  },
+  "popup": {
+    "success_message": "交易发送成功！",
+    "confirmation_progress": "确认：",
+    "transaction_id": "交易 ID：",
+    "close_button": "关闭",
+    "confirming": "确认中...",
+    "transaction_success": "交易成功！TXID:"
+  },
+  "seed_reveal": {
+    "button_reveal": "🔓 显示助记词",
+    "warning_title": "⚠️ 助记词 (24 个词)：",
+    "copy_button": "📋 复制",
+    "timeout_warning": "该助记词将在 30 秒后自动隐藏",
+    "button_hide": "🔒 隐藏助记词",
+    "copy_success": "助记词已复制到剪贴板！",
+    "copy_fallback": "助记词已复制！"
+  }
+}

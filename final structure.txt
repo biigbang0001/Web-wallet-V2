@@ -1,0 +1,26 @@
+var/www/wallet-nito-test/
+├── index.html
+├── sw.js
+├── locales/
+│   ├── fr.json
+│   ├── en.json
+│   ├── de.json
+│   ├── es.json
+│   ├── nl.json
+│   ├── ru.json
+│   └── zh.json
+├── src/
+│   ├── app.js
+│   ├── vendor.js
+│   ├── events.js
+│   ├── config.js
+│   ├── security.js
+│   ├── blockchain.js
+│   ├── wallet.js
+│   ├── transactions.js
+│   ├── messaging.js
+│   └── ui-handlers.js
+├── api/
+│   └── get-counter.php
+└── data/
+    └── counter.txt
