@@ -153,7 +153,16 @@
     "invalid_hex_format": "Format hex invalide - doit contenir 64 caractères",
     "private_key_32_bytes": "La clé privée doit faire 32 octets",
     "invalid_wif_format": "Format WIF invalide",
-    "invalid_wif": "WIF invalide: {{error}}"
+    "invalid_wif": "WIF invalide: {{error}}",
+    "session_expired_title": "Session expirée",
+    "session_expired_message": "Votre session a expiré après 10 minutes d'inactivité",
+    "auto_reload_message": "Rechargement automatique en cours...",
+    "session_timeout_warning": "Session expirée par sécurité",
+    "inactivity_detected": "Inactivité détectée",
+    "security_timeout": "Délai de sécurité dépassé",
+    "auto_reload_in_progress": "Rechargement automatique...",
+    "session_will_expire": "La session expirera automatiquement",
+    "please_save_data": "Veuillez sauvegarder vos données importantes"
   },
   "messaging": {
     "searching_pubkey_for": "Recherche clé publique pour:",
