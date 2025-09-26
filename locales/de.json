@@ -1,14 +1,14 @@
 {
   "languages": {
-    "fr": "Französisch",
-    "en": "Englisch",
+    "fr": "Français",
+    "en": "English",
     "de": "Deutsch",
-    "es": "Spanisch",
-    "nl": "Niederländisch",
-    "ru": "Russisch",
-    "zh": "Chinesisch"
+    "es": "Español",
+    "nl": "Nederlands",
+    "ru": "Русский",
+    "zh": "中文"
   },
-  "title": "Wallet NITO",
+  "title": "NITO Wallet",
   "language_label": "Sprache:",
   "counter": {
     "keys_generated": "🔑 Nito-Schlüssel generiert:"
@@ -18,7 +18,7 @@
     "generate_button": "🎲 Generieren",
     "copy": "📋 Kopieren",
     "reveal": "👁️ Anzeigen",
-    "warning": "⚠️ Speichern Sie den privaten Schlüssel sofort! Er wird nach 10 Minuten Inaktivität oder nach einem Neuladen der Seite gelöscht."
+    "warning": "⚠️ Speichern Sie den privaten Schlüssel sofort! Er wird nach 10 Minuten Inaktivität oder nach dem Neuladen der Seite gelöscht."
   },
   "import_section": {
     "title": "📥 Wallet importieren",
@@ -31,10 +31,10 @@
     "destination_placeholder": "Empfängeradresse",
     "amount_placeholder": "Betrag (NITO)",
     "fee_placeholder": "Gebühr (NITO)",
-    "debit_label": "Abzuziehende Adresse:",
+    "debit_label": "Abbuchungsadresse:",
     "bech32_option": "Bech32",
     "prepare_button": "🔍 Vorbereiten",
-    "broadcast_button": "✅ Transaktion senden",
+    "broadcast_button": "✅ Transaktion übertragen",
     "cancel_button": "❌ Abbrechen",
     "signed_tx": "Signierte Transaktion (hex):",
     "copy_tx": "📋 Kopieren"
@@ -52,39 +52,40 @@
     "unread_messages": "ungelesene Nachrichten",
     "validate_button": "✅ Senden bestätigen",
     "cancel_button": "❌ Abbrechen",
-    "recipient_placeholder": "Bech32-Adresse des Empfängers (nito1...)"
+    "recipient_placeholder": "Bech32-Empfängeradresse (nito1...)"
   },
   "messaging_estimated_cost": "Geschätzte Kosten: 0.0001 NITO (1 Transaktion)",
   "messaging_recipient_title": "📧 Nachrichtenempfänger",
   "footer": {
     "open_source": "Dieses Projekt ist Open Source",
     "view_code": "Code auf GitHub ansehen",
-    "official_site": "Offizielle NITO-Seite"
+    "official_site": "Offizielle NITO-Website"
   },
   "max_button": {
     "text": "MAX"
   },
   "chat": {
-    "copy_seed": "📑 Mnemonische Phrase kopieren"
+    "copy_seed": "📑 Mnemonik kopieren"
   },
   "errors": {
-    "initialization_failed": "Anwendungsinitialisierung fehlgeschlagen. Bitte Seite neu laden.",
+    "initialization_failed": "App-Initialisierung fehlgeschlagen. Bitte Seite aktualisieren.",
     "import_first": "Importieren Sie zuerst ein Wallet.",
-    "enter_key": "Bitte geben Sie einen privaten Schlüssel, eine Mnemonik oder XPRV ein",
+    "enter_key": "Bitte geben Sie einen privaten Schlüssel, eine Mnemonik oder ein XPRV ein",
     "import_failed": "Import fehlgeschlagen",
     "import_error": "Importfehler",
     "enter_email_password": "Bitte E-Mail und Passwort eingeben",
     "connection_failed": "Verbindung fehlgeschlagen",
     "connection_error": "Verbindungsfehler",
-    "generation_failed": "Fehler bei der Generierung",
-    "fill_destination_amount": "Bitte Zieladresse und Betrag ausfüllen",
+    "generation_failed": "Generierungsfehler",
+    "fill_destination_amount": "Bitte Zieladresse und Betrag eingeben",
     "transaction_functions_unavailable": "Transaktionsfunktionen nicht verfügbar",
     "amount_too_high": "Betrag zu hoch",
-    "transaction_prep_failed": "Vorbereitung der Transaktion fehlgeschlagen",
-    "no_transaction": "Keine Transaktion zum Senden",
+    "transaction_prep_failed": "Transaktionsvorbereitung fehlgeschlagen",
+    "no_transaction": "Keine Transaktion zum Übertragen",
     "rpc_unavailable": "RPC-Funktion nicht verfügbar",
-    "broadcast_failed": "Senden fehlgeschlagen",
-    "consolidation_unavailable": "Konsolidierungsfunktion nicht verfügbar"
+    "broadcast_failed": "Übertragung fehlgeschlagen",
+    "consolidation_unavailable": "Konsolidierungsfunktion nicht verfügbar",
+    "error_details": "Fehler"
   },
   "consolidate": {
     "cta": "UTXOs konsolidieren",
@@ -98,11 +99,11 @@
     "wallet_setup": "Wallet wird eingerichtet...",
     "refreshing": "⏛ Aktualisierung...",
     "importing_wallet": "Wallet wird importiert...",
-    "connecting_email": "Verbindung per E-Mail...",
+    "connecting_email": "Verbindung über E-Mail...",
     "balance_refresh": "Kontostand wird aktualisiert…",
-    "blockchain_scan": "Blockchain-Scan läuft...",
+    "blockchain_scan": "Blockchain wird gescannt...",
     "cache_clearing": "Cache wird geleert...",
-    "utxo_scan": "UTXOs werden analysiert...",
+    "utxo_scan": "UTXOs werden gescannt...",
     "balance_updated": "✅ Kontostand aktualisiert!",
     "update_error": "❌ Aktualisierungsfehler"
   },
@@ -111,16 +112,129 @@
     "confirmation_progress": "Bestätigung:",
     "transaction_id": "Transaktions-ID:",
     "close_button": "Schließen",
-    "confirming": "Bestätigen...",
+    "confirming": "Bestätigung läuft...",
     "transaction_success": "Transaktion erfolgreich! TXID:"
   },
   "seed_reveal": {
-    "button_reveal": "🔓 Mnemonische Phrase anzeigen",
-    "warning_title": "⚠️ Mnemonische Phrase (24 Wörter):",
+    "button_reveal": "🔓 Mnemonik anzeigen",
+    "warning_title": "⚠️ Mnemonik (24 Wörter):",
     "copy_button": "📋 Kopieren",
-    "timeout_warning": "Diese Phrase wird in 30 Sekunden automatisch ausgeblendet",
-    "button_hide": "🔒 Phrase verbergen",
-    "copy_success": "Mnemonische Phrase in die Zwischenablage kopiert!",
-    "copy_fallback": "Mnemonische Phrase kopiert!"
+    "timeout_warning": "Dieser Satz wird nach 30 Sekunden automatisch ausgeblendet",
+    "button_hide": "🔒 Satz ausblenden",
+    "copy_success": "Mnemonik in Zwischenablage kopiert!",
+    "copy_fallback": "Mnemonik kopiert!"
+  },
+  "system": {
+    "initialization_error_title": "Initialisierungsfehler",
+    "reload_page": "Seite neu laden",
+    "wallet_ready": "NITO Wallet bereit in {{time}}ms - Version {{version}}"
+  },
+  "transactions": {
+    "insufficient_funds_detailed": "Unzureichende Mittel. Verwenden Sie die MAX-Taste oder reduzieren Sie den Betrag um {{amount}} NITO, um die Gebühren zu decken.",
+    "insufficient_funds_after_fees": "Unzureichende Mittel nach Gebühren",
+    "no_suitable_utxos": "Kein geeigneter reifer UTXO verfügbar",
+    "need_at_least_utxos": "Mindestens {{count}} reife UTXOs erforderlich. Gefunden: {{found}}",
+    "consolidation_confirm": "{{count}} UTXOs konsolidieren → {{batches}} UTXO(s)\nGesamt: {{total}} NITO\nTyp: {{type}}\n\nBestätigen?",
+    "consolidation_completed": "Konsolidierung abgeschlossen!\n{{original}} UTXOs → {{final}} UTXO(s)\nTransaktionen: {{txCount}}\nTyp: {{type}}",
+    "no_utxos_for_consolidation": "Keine UTXOs zur Konsolidierung verfügbar",
+    "consolidation_error": "Konsolidierungsfehler: {{error}}",
+    "utxo_insufficient": "UTXO unzureichend. Erforderlich: {{required}}, Verfügbar: {{available}}"
+  },
+  "security": {
+    "rate_limit_exceeded": "Rate-Limit überschritten. Bitte warten Sie {{seconds}} Sekunden, bevor Sie es erneut versuchen.",
+    "failed_to_encrypt": "Verschlüsselung sensibler Daten fehlgeschlagen",
+    "invalid_tweaked_key": "Ungültiger modifizierter privater Schlüssel",
+    "element_not_found": "Element nicht gefunden",
+    "nothing_to_copy": "Nichts zu kopieren",
+    "please_reveal_first": "Bitte zuerst Inhalt anzeigen",
+    "copy_failed": "Kopieren fehlgeschlagen",
+    "copied": "Kopiert!",
+    "invalid_private_key": "Ungültiger privater Schlüssel",
+    "invalid_hex_format": "Ungültiges Hex-Format - muss 64 Zeichen enthalten",
+    "private_key_32_bytes": "Privater Schlüssel muss 32 Bytes lang sein",
+    "invalid_wif_format": "Ungültiges WIF-Format",
+    "invalid_wif": "Ungültiges WIF: {{error}}"
+  },
+  "messaging": {
+    "searching_pubkey_for": "Suche öffentlichen Schlüssel für:",
+    "no_pubkey_found_for": "Kein öffentlicher Schlüssel gefunden für:",
+    "pubkey_found_validated_for": "ÖFFENTLICHER SCHLÜSSEL GEFUNDEN UND VALIDERT für:",
+    "decryption_ecdh_completed": "ECDH-Entschlüsselung abgeschlossen, Nachricht verifiziert:",
+    "encryption_ecdh_for": "ECDH-Verschlüsselung für:",
+    "no_transactions_found": "Keine Transaktionen gefunden für:",
+    "analyzing_transactions": "Analyse von {{count}} Batch-Transaktionen...",
+    "batch_completed": "Batch {{current}}/{{total}} abgeschlossen: {{valid}}/{{processed}} Transaktionen analysiert",
+    "mempool_analysis": "Mempool: Analyse von {{count}} Transaktionen",
+    "mempool_relevant_added": "Mempool: {{count}} relevante (vollständige) Transaktionen hinzugefügt",
+    "total_analyzed": "Gesamt: {{count}} vollständig analysierte Transaktionen",
+    "error_retrieving_transactions": "Fehler beim Abrufen von Transaktionen:",
+    "utxos_protected": "UTXOs geschützt: {{count}}",
+    "no_address_or_unknown": "Ungültige oder unbekannte Adresse:",
+    "message_reconstituted": "Nachricht {{id}} rekonstruiert, Größe: {{size}}",
+    "message_ignored_recipient": "Nachricht {{id}} ignoriert (für {{recipient}} bestimmt)",
+    "message_incomplete": "Nachricht {{id}} unvollständig: {{chunks}}/{{total}} Chunks",
+    "decryption_error": "Entschlüsselungsfehler Nachricht {{id}}:",
+    "encryption_successful": "Nachricht verschlüsselt mit ECDH + AES-GCM",
+    "pubkey_published": "Öffentlicher Schlüssel veröffentlicht, TXID: {{txid}}",
+    "publication_error": "Veröffentlichungsfehler: {{error}}",
+    "no_utxo_for_pubkey": "Kein UTXO verfügbar, um öffentlichen Schlüssel zu veröffentlichen",
+    "preparing_optimized_utxos": "Vorbereitung von {{count}} optimierten UTXOs für Nachrichten...",
+    "split_fees": "Aufteilungsvorbereitung Gebühren: {{satoshis}} Satoshis ({{nito}} NITO)",
+    "estimated_fees_per_chunk": "Geschätzte Gebühren pro Chunk: {{satoshis}} Satoshis ({{nito}} NITO)",
+    "adaptive_utxos": "Adaptive UTXOs: {{amount}} NITO",
+    "creating_utxos": "Erstelle {{count}} UTXOs von jeweils {{amount}} NITO",
+    "utxos_prepared": "UTXOs vorbereitet, TXID: {{txid}}",
+    "waiting_new_utxos": "Warte auf neue UTXOs...",
+    "utxos_available": "{{count}} spezifisch optimierte UTXOs verfügbar!",
+    "preparation_complete": "Vorbereitung abgeschlossen",
+    "timeout_new_utxos": "Timeout: neue UTXOs nach 60 Minuten nicht bestätigt",
+    "parallel_sending": "Paralleles Senden mit {{utxos}} UTXOs für {{chunks}} Chunks",
+    "preparing_chunk": "Vorbereitung Chunk {{current}}/{{total}} mit UTXO {{txid}}:{{vout}} ({{amount}} NITO)",
+    "creating_all_transactions": "Alle Transaktionen werden erstellt (Batch von 100)...",
+    "all_transactions_prepared": "Alle Transaktionen vorbereitet",
+    "sending_completed": "Senden abgeschlossen: {{successful}}/{{total}} Chunks erfolgreich",
+    "batch_sending": "Batch {{current}}/{{total}}: {{count}} Transaktionen ({{remaining}} verbleibend)",
+    "chunk_sent": "Chunk {{current}}/{{total}} gesendet: {{txid}}",
+    "mempool_conflict": "Mempool-Konflikt für Chunk {{chunk}}. Kein erneuter Versuch.",
+    "chunk_already_confirmed": "Chunk {{chunk}} bereits bestätigt",
+    "attempt_failed": "Versuch {{attempt}}/{{max}} fehlgeschlagen für Chunk {{chunk}}: {{error}}",
+    "chunk_abandoned": "Chunk {{chunk}} nach {{attempts}} Versuchen aufgegeben",
+    "batch_completed_results": "Batch {{batch}} abgeschlossen: {{successes}} Erfolge, {{failures}} Fehler, {{remaining}} verbleibend",
+    "pause_before_next": "Pause {{delay}}ms vor dem nächsten Batch...",
+    "message_sent_to": "Nachricht gesendet an:",
+    "message_divided": "Nachricht in {{chunks}} Chunks aufgeteilt",
+    "preparation_step": "Vorbereitung",
+    "missing_optimized_utxos": "Vorbereitung von {{count}} fehlenden optimierten UTXOs...",
+    "insufficient_utxos_no_conflict": "Unzureichende UTXOs, um {{chunks}} Chunks ohne Konflikt zu senden.",
+    "filtered_available_utxos": "Gefilterte verfügbare UTXOs: {{count}}",
+    "effective_fee_rate": "Effektiver Gebührensatz erreicht"
+  },
+  "confirmations": {
+    "checking_confirmation": "Überprüfe Bestätigungen...",
+    "confirmed": "Bestätigt",
+    "pending": "Ausstehend"
+  },
+  "testing": {
+    "full_messaging_test": "Vollständiger Noble-ECDH-Messaging-Systemtest",
+    "publishing_pubkey": "1. Öffentlichen Schlüssel veröffentlichen...",
+    "sending_test_message": "2. Testnachricht an sich selbst senden...",
+    "test_message_content": "Verschlüsselte Noble-ECDH-Testnachricht",
+    "scanning_received_messages": "3. Empfangene Nachrichten scannen...",
+    "messages_found": "Nachrichten gefunden:",
+    "test_failed": "Test fehlgeschlagen:",
+    "test_successful": "Test erfolgreich:"
+  },
+  "wallet": {
+    "hd_wallet_generated": "HD-Wallet generiert ({{words}} Wörter):",
+    "wallet_imported_successfully": "Wallet erfolgreich importiert:",
+    "email_wallet_connected": "E-Mail-Wallet erfolgreich verbunden ({{words}} Wörter)",
+    "calculating_balances": "Kontostände werden berechnet...",
+    "import_successful_calculating": "Import erfolgreich, Kontostände werden berechnet...",
+    "email_connection_started": "E-Mail-Verbindung gestartet, Wallet wird generiert...",
+    "email_wallet_generated": "E-Mail-Wallet generiert, Kontostände werden berechnet..."
+  },
+  "explorer": {
+    "primary_unavailable": "Primärer Explorer nicht verfügbar, Fallback-Explorer wird verwendet",
+    "checking_explorer": "Fehler beim Überprüfen des Explorers:"
   }
 }
