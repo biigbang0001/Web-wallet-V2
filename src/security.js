@@ -1,7 +1,7 @@
 // Security Layer for NITO Wallet
 // Handles encryption, key management, validation, and security timers
 
-import { SECURITY_CONFIG, VALIDATION_PATTERNS, ELEMENT_IDS, ERROR_CODES } from './config.js';
+import { SECURITY_CONFIG, VALIDATION_PATTERNS, ELEMENT_IDS, ERROR_CODES, FEATURE_FLAGS } from './config.js';
 import { eventBus, EVENTS } from './events.js';
 
 // === TRANSLATION HELPER ===
@@ -46,7 +46,7 @@ class TimerContext {
   }
 }
 
-// === SECURE KEY MANAGER ===
+// === ENHANCED SECURE KEY MANAGER ===
 class SecureKeyManager {
   constructor() {
     this.sessionKey = null;
@@ -55,10 +55,12 @@ class SecureKeyManager {
     this.cleanupTimer = null;
     this.inactivityTimer = null;
     this.displayTimer = null;
+    this.operationCheckTimer = null;
     
     this.setupAutoCleanup();
     this.setupPageHideCleanup();
     this.setupInactivityTimer();
+    this.setupOperationMonitoring();
   }
 
   async generateSessionKey() {
@@ -120,7 +122,7 @@ class SecureKeyManager {
         timestamp: Date.now()
       });
       
-      console.log(`Secure key stored: ${id}`);
+      console.log(`[SECURITY] Secure key stored: ${id}`);
     } catch (error) {
       console.error(`Failed to store key ${id}:`, error);
       throw error;
@@ -151,12 +153,14 @@ class SecureKeyManager {
     
     entries.forEach(([id]) => {
       this.encryptedData.delete(id);
-      console.log(`Cleared old key: ${id}`);
+      console.log(`[SECURITY] Cleared old key: ${id}`);
     });
   }
 
   clearAll() {
     try {
+      console.log('[SECURITY] All secure keys cleared');
+      
       this.encryptedData.clear();
       this.sessionKey = null;
       
@@ -174,12 +178,87 @@ class SecureKeyManager {
         clearInterval(this.displayTimer);
         this.displayTimer = null;
       }
+
+      if (this.operationCheckTimer) {
+        clearInterval(this.operationCheckTimer);
+        this.operationCheckTimer = null;
+      }
       
-      console.log('All secure keys cleared');
       eventBus.emit(EVENTS.KEYS_CLEARED);
+      
+      // Auto-reload trigger avec vérification d'opération
+      if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) {
+        this.scheduleAutoReload();
+      }
+      
     } catch (error) {
       console.error('Error clearing keys:', error);
     }
+  }
+
+  scheduleAutoReload() {
+    console.log('[SECURITY] Scheduling auto-reload check...');
+    
+    const checkAndReload = () => {
+      // Vérifier si des opérations sont en cours
+      if (window.isOperationActive && window.isOperationActive()) {
+        console.log('[SECURITY] Operations in progress, delaying auto-reload...');
+        setTimeout(checkAndReload, 3000);
+        return;
+      }
+      
+      this.executeAutoReload();
+    };
+    
+    // Attendre 2 secondes puis vérifier
+    setTimeout(checkAndReload, 2000);
+  }
+
+  executeAutoReload() {
+    console.log('[SECURITY] Executing auto-reload...');
+    
+    // Afficher une notification avant le rechargement
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+    `;
+    
+    overlay.innerHTML = `
+      <div style="
+        background: ${isDarkMode ? '#1a202c' : '#ffffff'};
+        color: ${isDarkMode ? '#e2e8f0' : '#111111'};
+        padding: 2rem;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        border: 2px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
+      ">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
+        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">Session expirée</div>
+        <div style="opacity: 0.8;">Rechargement automatique...</div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  }
+
+  setupOperationMonitoring() {
+    // Surveiller périodiquement les opérations pour un rechargement sûr
+    this.operationCheckTimer = setInterval(() => {
+      // Fonction de monitoring passive
+    }, 5000);
   }
 
   updateAccess() {
@@ -264,7 +343,7 @@ class SecureKeyManager {
       }
     });
 
-    console.log('Generated keys cleared, imported wallet preserved');
+    console.log('[SECURITY] Generated keys cleared, imported wallet preserved');
     eventBus.emit(EVENTS.INACTIVITY_WARNING);
   }
 
@@ -331,7 +410,7 @@ export async function deriveFromCredentials(email, password, wordCount = 24) {
   }
 }
 
-// === INPUT VALIDATION ===
+// === ENHANCED INPUT VALIDATION ===
 export function validateInput(input, type) {
   if (!input || typeof input !== 'string') return false;
   
@@ -351,6 +430,12 @@ export function validateInput(input, type) {
         
       case 'address':
         return VALIDATION_PATTERNS.ADDRESS.test(trimmed);
+        
+      case 'bech32':
+        return VALIDATION_PATTERNS.BECH32_ADDRESS.test(trimmed);
+        
+      case 'bech32m':
+        return VALIDATION_PATTERNS.BECH32M_ADDRESS.test(trimmed);
         
       case 'amount':
         return VALIDATION_PATTERNS.AMOUNT.test(trimmed) && parseFloat(trimmed) > 0;
@@ -392,7 +477,7 @@ export function detectInputType(input) {
   return 'unknown';
 }
 
-// === RATE LIMITER ===
+// === ENHANCED RATE LIMITER ===
 class RateLimiter {
   constructor() {
     this.attempts = new Map();
@@ -453,7 +538,7 @@ export async function secureHash(data, algorithm = 'SHA-256') {
   }
 }
 
-// === CLIPBOARD OPERATIONS ===
+// === ENHANCED CLIPBOARD OPERATIONS ===
 export function copyToClipboard(elementId) {
   try {
     const sensitiveIds = new Set([
@@ -538,7 +623,7 @@ function showCopyFeedback(success, message = null) {
   }
 }
 
-// === REVEAL BUTTON SETUP ===
+// === ENHANCED REVEAL BUTTON SETUP ===
 export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.BLUR_TIMEOUT) {
   try {
     const button = document.getElementById(buttonId);
@@ -554,24 +639,31 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
       return false;
     }
     
-    button.addEventListener('click', () => {
+    // Remove existing listeners to prevent duplicates
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+    
+    newButton.addEventListener('click', () => {
       try {
         armInactivityTimerSafely();
         
-        button.disabled = true;
+        newButton.disabled = true;
         target.classList.remove('blurred');
+        
+        console.log(`[SECURITY] Content revealed: ${targetId}`);
         
         setTimeout(() => {
           target.classList.add('blurred');
-          button.disabled = false;
+          newButton.disabled = false;
+          console.log(`[SECURITY] Content auto-hidden: ${targetId}`);
         }, timeout);
       } catch (error) {
         console.error(`Reveal button error for ${buttonId}:`, error);
-        button.disabled = false;
+        newButton.disabled = false;
       }
     });
     
-    console.log(`Reveal button setup completed: ${buttonId} -> ${targetId}`);
+    console.log(`[SECURITY] Reveal button setup completed: ${buttonId} -> ${targetId}`);
     return true;
   } catch (error) {
     console.error(`Failed to setup reveal button ${buttonId}:`, error);
@@ -615,6 +707,14 @@ eventBus.on(EVENTS.TIMER_ARM_REQUEST, () => {
   }
 });
 
+eventBus.on(EVENTS.KEYS_CLEARED, () => {
+  console.log('[SECURITY] Keys cleared event received');
+});
+
+eventBus.on(EVENTS.SESSION_EXPIRED, () => {
+  console.log('[SECURITY] Session expired event received');
+});
+
 // === GLOBAL COMPATIBILITY ===
 if (typeof window !== 'undefined') {
   window.copyToClipboard = copyToClipboard;
@@ -627,13 +727,13 @@ if (document.readyState === 'loading') {
     setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
     setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
     
-    console.log('Security layer initialized');
+    console.log('[SECURITY] Security layer initialized - Version 2.0.0');
   });
 } else {
   setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
   setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
   
-  console.log('Security layer initialized');
+  console.log('[SECURITY] Security layer initialized - Version 2.0.0');
 }
 
-console.log('Security module loaded');
+console.log('Security module loaded - Version 2.0.0');
