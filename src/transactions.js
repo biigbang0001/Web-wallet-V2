@@ -6,6 +6,14 @@ import { armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
+// === TRANSLATION HELPER ===
+function getTranslation(key, fallback, params = {}) {
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : () => fallback || key;
+  return t(key, { ...params, defaultValue: fallback });
+}
+
 async function getBitcoinLibraries() {
   await waitForLibraries();
   
@@ -112,7 +120,8 @@ export class TaprootUtils {
     const tweakedPrivateKey = bitcoin.crypto.privateAdd(privateKey, tweak);
     
     if (!tweakedPrivateKey) {
-      throw new Error('Invalid tweaked private key');
+      const errorMsg = getTranslation('security.invalid_tweaked_key', 'Clé privée modifiée invalide');
+      throw new Error(errorMsg);
     }
     
     const tweakedPublicKey = bitcoin.crypto.pointFromScalar(tweakedPrivateKey, true);
@@ -192,24 +201,32 @@ export class SimpleTransactionBuilder {
     
     const walletInfo = await getWalletInfo();
     if (!walletInfo.isReady) {
-      throw new Error('Please import a wallet first');
+      const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+      throw new Error(errorMsg);
     }
 
     const selectedAddressType = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE)?.value || 'bech32';
     const sourceAddress = selectedAddressType === 'p2tr' ? walletInfo.addresses.taproot : walletInfo.addresses.bech32;
     
     if (!window.utxos) {
-      throw new Error('UTXO functions not available');
+      const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+      throw new Error(errorMsg);
     }
 
     const hdWallet = window.hdManager ? window.hdManager.hdWallet : null;
     const isHD = window.importType === 'hd';
 
     const rawUtxos = await window.utxos(sourceAddress, isHD, hdWallet);
-    if (!rawUtxos.length) throw new Error('No UTXOs available');
+    if (!rawUtxos.length) {
+      const errorMsg = getTranslation('transactions.no_utxos_for_consolidation', 'Aucun UTXO disponible pour la consolidation');
+      throw new Error(errorMsg);
+    }
 
     const matureUtxos = await filterMatureUtxos(rawUtxos);
-    if (!matureUtxos.length) throw new Error('No mature UTXOs available');
+    if (!matureUtxos.length) {
+      const errorMsg = getTranslation('transactions.no_suitable_utxos', 'Aucun UTXO mature approprié disponible');
+      throw new Error(errorMsg);
+    }
 
     let workingUtxos;
     if (isConsolidation) {
@@ -223,7 +240,10 @@ export class SimpleTransactionBuilder {
         : filteredUtxos.filter(u => ['p2wpkh', 'p2pkh', 'p2sh'].includes(u.scriptType));
     }
 
-    if (!workingUtxos.length) throw new Error('No suitable mature UTXOs available');
+    if (!workingUtxos.length) {
+      const errorMsg = getTranslation('transactions.no_suitable_utxos', 'Aucun UTXO mature approprié disponible');
+      throw new Error(errorMsg);
+    }
 
     const target = Math.round(amt * 1e8);
     workingUtxos.sort((a, b) => b.amount - a.amount);
@@ -256,7 +276,11 @@ export class SimpleTransactionBuilder {
       
       if (total < target + finalFees) {
         const shortfall = (target + finalFees - total) / 1e8;
-        throw new Error(`Insufficient funds. Use MAX button or reduce amount by ${shortfall.toFixed(8)} NITO to cover fees.`);
+        const errorMsg = getTranslation('transactions.insufficient_funds_detailed', 
+          `Fonds insuffisants. Utilisez le bouton MAX ou réduisez le montant de ${shortfall.toFixed(8)} NITO pour couvrir les frais.`,
+          { amount: shortfall.toFixed(8) }
+        );
+        throw new Error(errorMsg);
       }
     }
 
@@ -274,7 +298,8 @@ export class SimpleTransactionBuilder {
     const change = total - target - fees;
     
     if (change < 0) {
-      throw new Error('Insufficient funds after fee calculation');
+      const errorMsg = getTranslation('transactions.insufficient_funds_after_fees', 'Fonds insuffisants après calcul des frais');
+      throw new Error(errorMsg);
     }
 
     const psbt = new bitcoin.Psbt({ network: NITO_NETWORK });
@@ -378,7 +403,8 @@ export async function consolidateUtxos() {
   try {
     const walletInfo = await getWalletInfo();
     if (!walletInfo.isReady) {
-      alert('Please import a wallet first');
+      const alertMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+      alert(alertMsg);
       return;
     }
 
@@ -388,7 +414,8 @@ export async function consolidateUtxos() {
     if (spinner) spinner.style.display = 'block';
 
     if (!window.utxos) {
-      throw new Error('UTXO functions not available');
+      const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+      throw new Error(errorMsg);
     }
 
     const hdWallet = window.hdManager ? window.hdManager.hdWallet : null;
@@ -416,7 +443,11 @@ export async function consolidateUtxos() {
     
     if (allUtxos.length < 2) {
       if (spinner) spinner.style.display = 'none';
-      alert(`Need at least 2 mature UTXOs to consolidate. Found: ${allUtxos.length}`);
+      const alertMsg = getTranslation('transactions.need_at_least_utxos',
+        `Besoin d'au moins 2 UTXOs matures pour consolider. Trouvés: ${allUtxos.length}`,
+        { count: 2, found: allUtxos.length }
+      );
+      alert(alertMsg);
       return;
     }
 
@@ -430,11 +461,17 @@ export async function consolidateUtxos() {
       batches.push(batch);
     }
 
-    const confirmed = confirm(
-      `Consolidate ${allUtxos.length} UTXOs → ${batches.length} UTXO(s)\n` +
-      `Total: ${totalValue.toFixed(8)} NITO\n` +
-      `Type: ${sourceType}\n\nConfirm?`
+    const confirmMsg = getTranslation('transactions.consolidation_confirm',
+      `Consolider ${allUtxos.length} UTXOs → ${batches.length} UTXO(s)\nTotal: ${totalValue.toFixed(8)} NITO\nType: ${sourceType}\n\nConfirmer?`,
+      { 
+        count: allUtxos.length, 
+        batches: batches.length, 
+        total: totalValue.toFixed(8), 
+        type: sourceType 
+      }
     );
+
+    const confirmed = confirm(confirmMsg);
 
     if (!confirmed) {
       if (spinner) spinner.style.display = 'none';
@@ -472,7 +509,8 @@ export async function consolidateUtxos() {
         );
         
         if (!window.rpc) {
-          throw new Error('RPC function not available');
+          const errorMsg = getTranslation('errors.rpc_unavailable', 'Fonction RPC non disponible');
+          throw new Error(errorMsg);
         }
         
         const txid = await window.rpc('sendrawtransaction', [result.hex]);
@@ -500,12 +538,17 @@ export async function consolidateUtxos() {
       await window.showSuccessPopup(finalTxid);
     }
 
-    alert(
-      `Consolidation completed!\n` +
-      `${allUtxos.length} UTXOs → ${txids.length} UTXO(s)\n` +
-      `Transactions: ${txids.length}\n` +
-      `Type: ${sourceType}`
+    const successMsg = getTranslation('transactions.consolidation_completed',
+      `Consolidation terminée!\n${allUtxos.length} UTXOs → ${txids.length} UTXO(s)\nTransactions: ${txids.length}\nType: ${sourceType}`,
+      { 
+        original: allUtxos.length, 
+        final: txids.length, 
+        txCount: txids.length, 
+        type: sourceType 
+      }
     );
+
+    alert(successMsg);
     
     setTimeout(() => {
       const refreshBtn = document.getElementById(ELEMENT_IDS.REFRESH_BALANCE_BUTTON);
@@ -515,7 +558,12 @@ export async function consolidateUtxos() {
   } catch (e) {
     const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
     if (spinner) spinner.style.display = 'none';
-    alert(`Consolidation error: ${e.message}`);
+    
+    const errorMsg = getTranslation('transactions.consolidation_error', 
+      `Erreur de consolidation: ${e.message}`,
+      { error: e.message }
+    );
+    alert(errorMsg);
     console.error('Consolidation error:', e);
   }
 }
@@ -525,7 +573,8 @@ export async function transferToP2SH(amt) {
   armInactivityTimerSafely();
   
   if (!window.getWalletPublicKey) {
-    throw new Error('Please import a wallet first');
+    const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+    throw new Error(errorMsg);
   }
   
   const walletPublicKey = await window.getWalletPublicKey();
