@@ -1,8 +1,7 @@
-// NITO Wallet Application Entry Point 
-// Main orchestrator for initialization and module coordination
+// Security Layer for NITO Wallet
+// Handles encryption, key management, validation, and security timers
 
-import { CONFIG, VERSION, ELEMENT_IDS, UI_CONFIG, OPERATION_STATE, FEATURE_FLAGS } from './config.js';
-import { loadExternalLibraries, areLibrariesReady } from './vendor.js';
+import { SECURITY_CONFIG, VALIDATION_PATTERNS, ELEMENT_IDS, ERROR_CODES, FEATURE_FLAGS } from './config.js';
 import { eventBus, EVENTS } from './events.js';
 
 // === TRANSLATION HELPER ===
@@ -13,243 +12,250 @@ function getTranslation(key, fallback, params = {}) {
   return t(key, { ...params, defaultValue: fallback });
 }
 
-// === OPERATIONS TRACKING ===
-export function startOperation(operationType) {
-  OPERATION_STATE.activeOperations.add(operationType);
-  console.log(`[OPERATION] Started: ${operationType}`);
-}
-
-export function endOperation(operationType) {
-  OPERATION_STATE.activeOperations.delete(operationType);
-  console.log(`[OPERATION] Ended: ${operationType}`);
-}
-
-export function isOperationActive(operationType = null) {
-  if (operationType) {
-    return OPERATION_STATE.activeOperations.has(operationType);
-  }
-  return OPERATION_STATE.activeOperations.size > 0;
-}
-
-// === LOADING MODAL SYSTEM ===
-function showLoading(message) {
-  try {
-    let modal = document.getElementById('loadingModal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'loadingModal';
-      modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;';
-      
-      const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-      modal.innerHTML = `
-        <div style="
-          background: ${isDarkMode ? '#1a202c' : '#ffffff'};
-          color: ${isDarkMode ? '#e2e8f0' : '#111111'};
-          border: 1px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
-          padding: 1.5rem 2rem;
-          border-radius: 16px;
-          box-shadow: 0 10px 30px rgba(0,0,0,${isDarkMode ? '0.5' : '0.2'});
-          text-align: center;
-          min-width: 300px;
-          max-width: 90vw;
-          backdrop-filter: blur(10px);
-        ">
-          <div style="font-size:2.5rem; line-height:1; margin-bottom:1rem; animation: rotate 1.2s linear infinite;">⌛</div>
-          <div class="loading-text" style="font-weight:600; font-size: 18px; margin-bottom: 0.5rem;">Actualisation du solde…</div>
-          <div style="font-size: 14px; opacity: 0.7;">Scan blockchain en cours...</div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-    }
-    const text = modal.querySelector('.loading-text');
-    if (text && message) text.textContent = message;
-    modal.style.display = 'flex';
-  } catch (e) {
-    console.warn('Loading modal error:', e);
-  }
-}
-
-function hideLoading() {
-  try {
-    const modal = document.getElementById('loadingModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-  } catch (e) {
-    console.warn('Hide loading error:', e);
-  }
-}
-
-// === BALANCE LOADING SYSTEM ===
-function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh') {
-  let modal = document.getElementById('balanceLoadingModal');
-  
-  if (show) {
-    const t = (window.i18next && typeof window.i18next.t === 'function') 
-      ? window.i18next.t 
-      : (key, fallback) => fallback || key;
-    
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'balanceLoadingModal';
-      modal.style.cssText = `
-        display: flex;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.4);
-        backdrop-filter: blur(6px);
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
-      `;
-      
-      document.body.appendChild(modal);
-    }
-    
-    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    const message = t(messageKey, 'Actualisation du solde…');
-    const subtitle = t('loading.blockchain_scan', 'Scan blockchain en cours...');
-    
-    modal.innerHTML = `
-      <div style="
-        background: ${isDarkMode ? '#1a202c' : '#ffffff'};
-        color: ${isDarkMode ? '#e2e8f0' : '#111111'};
-        border: 1px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
-        padding: 2rem 2.5rem;
-        border-radius: 20px;
-        box-shadow: 0 15px 40px rgba(0,0,0,${isDarkMode ? '0.6' : '0.25'});
-        text-align: center;
-        min-width: 320px;
-        max-width: 90vw;
-        backdrop-filter: blur(15px);
-        border: 2px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};
-      ">
-        <div style="font-size:3rem; line-height:1; margin-bottom:1.2rem; animation: rotate 1.5s linear infinite;">⌛</div>
-        <div class="loading-text" style="font-weight:700; font-size: 20px; margin-bottom: 0.8rem; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">${message}</div>
-        <div style="font-size: 15px; opacity: 0.8; margin-bottom: 1rem;">${subtitle}</div>
-        <div style="width: 100%; background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 10px; height: 6px; overflow: hidden;">
-          <div style="width: 100%; height: 100%; background: linear-gradient(90deg, ${isDarkMode ? '#3b82f6' : '#2563eb'}, ${isDarkMode ? '#1e40af' : '#1d4ed8'}); border-radius: 10px; animation: loading-bar 2s ease-in-out infinite;"></div>
-        </div>
-      </div>
-    `;
-    
-    // Ajouter l'animation CSS si elle n'existe pas
-    if (!document.querySelector('#loading-bar-style')) {
-      const style = document.createElement('style');
-      style.id = 'loading-bar-style';
-      style.textContent = `
-        @keyframes loading-bar {
-          0%, 100% { transform: translateX(-100%); }
-          50% { transform: translateX(100%); }
-        }
-        @keyframes rotate {
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-    
-    modal.style.display = 'flex';
-  } else {
-    if (modal) {
-      modal.style.display = 'none';
-    }
-  }
-}
-
-// === APPLICATION STATE ===
-let appInitialized = false;
-let initializationPromise = null;
-
-// === DEPENDENCY MANAGEMENT ===
-class DependencyManager {
+// === TIMER CONTEXT MANAGEMENT ===
+class TimerContext {
   constructor() {
-    this.loadedModules = new Set();
-    this.loadingPromises = new Map();
-    this.moduleErrors = new Map();
+    this.context = null;
+    this.callbacks = new Map();
   }
-
-  async loadModule(name, loader) {
-    if (this.loadedModules.has(name)) {
-      return this.loadingPromises.get(name);
+  
+  setContext(context, callback = null) {
+    this.context = context;
+    if (callback) {
+      this.callbacks.set(context, callback);
     }
-    if (this.moduleErrors.has(name)) {
-      throw this.moduleErrors.get(name);
-    }
-    const promise = (async () => {
+  }
+  
+  clearContext() {
+    this.context = null;
+  }
+  
+  executeCallback() {
+    const callback = this.callbacks.get(this.context);
+    if (callback && typeof callback === 'function') {
       try {
-        const result = await loader();
-        this.loadedModules.add(name);
-        return result;
+        callback();
       } catch (error) {
-        this.moduleErrors.set(name, error);
-        throw error;
+        console.warn('Timer callback execution failed:', error);
       }
-    })();
-    this.loadingPromises.set(name, promise);
-    return promise;
+    }
   }
-
-  isLoaded(name) { return this.loadedModules.has(name); }
-  getError(name) { return this.moduleErrors.get(name); }
-  reset() {
-    this.loadedModules.clear();
-    this.loadingPromises.clear();
-    this.moduleErrors.clear();
+  
+  hasContext(context) {
+    return this.context === context;
   }
 }
 
-// === ENHANCED AUTO-RELOAD SYSTEM ===
-function setupAutoReloadOnKeyClear() {
-  if (!FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) return;
-  
-  let clearDetected = false;
-  let clearTimer = null;
-  
-  const handleKeyClear = (eventData) => {
-    // CORRECTION: Vérifier la raison du nettoyage
-    const reason = eventData?.reason || 'unknown';
-    console.log(`[SECURITY] Key clear detected with reason: ${reason}`);
+// === ENHANCED SECURE KEY MANAGER ===
+class SecureKeyManager {
+  constructor() {
+    this.sessionKey = null;
+    this.encryptedData = new Map();
+    this.lastAccess = Date.now();
+    this.cleanupTimer = null;
+    this.inactivityTimer = null;
+    this.displayTimer = null;
+    this.operationCheckTimer = null;
+    this.lastClearReason = null; // Nouveau: track la raison du nettoyage
     
-    // Ne déclencher l'auto-reload que pour les timeouts de sécurité
-    if (reason !== 'security_timeout' && reason !== 'inactivity_timeout') {
-      console.log(`[SECURITY] Ignoring key clear for reason: ${reason}`);
-      return;
+    this.setupAutoCleanup();
+    this.setupPageHideCleanup();
+    this.setupInactivityTimer();
+    this.setupOperationMonitoring();
+  }
+
+  async generateSessionKey() {
+    if (!this.sessionKey) {
+      const keyMaterial = crypto.getRandomValues(new Uint8Array(32));
+      this.sessionKey = await crypto.subtle.importKey(
+        'raw',
+        keyMaterial,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+      );
     }
-    
-    if (clearDetected) return;
-    clearDetected = true;
-    
-    console.log('[SECURITY] Security timeout detected - preparing auto-reload');
-    
-    // Vérifier si une opération wallet est en cours
-    if (isWalletOperationActive()) {
-      console.log('[SECURITY] Wallet operation in progress, delaying auto-reload');
-      clearTimer = setTimeout(() => {
-        if (!isWalletOperationActive()) {
-          executeAutoReload();
-        } else {
-          handleKeyClear(eventData); // Réessayer
-        }
-      }, 5000);
-      return;
+    return this.sessionKey;
+  }
+
+  async encrypt(data) {
+    try {
+      const key = await this.generateSessionKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encoded = new TextEncoder().encode(JSON.stringify(data));
+      const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+      return { iv, data: new Uint8Array(encrypted) };
+    } catch (error) {
+      console.error('Encryption failed:', error);
+      const errorMsg = getTranslation('security.failed_to_encrypt', 'Échec du chiffrement des données sensibles');
+      throw new Error(errorMsg);
     }
+  }
+
+  async decrypt(encryptedData) {
+    try {
+      const key = await this.generateSessionKey();
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: encryptedData.iv },
+        key,
+        encryptedData.data
+      );
+      const decoded = new TextDecoder().decode(decrypted);
+      return JSON.parse(decoded);
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      throw new Error('Failed to decrypt sensitive data');
+    }
+  }
+
+  async storeKey(id, keyData) {
+    try {
+      this.updateAccess();
+      
+      if (this.encryptedData.size >= SECURITY_CONFIG.MAX_MEMORY_KEYS) {
+        console.warn('Maximum key storage exceeded, clearing oldest keys');
+        this.clearOldestKeys(1);
+      }
+      
+      const encrypted = await this.encrypt(keyData);
+      this.encryptedData.set(id, {
+        ...encrypted,
+        timestamp: Date.now()
+      });
+      
+      console.log(`[SECURITY] Secure key stored: ${id}`);
+    } catch (error) {
+      console.error(`Failed to store key ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async getKey(id) {
+    try {
+      this.updateAccess();
+      const encrypted = this.encryptedData.get(id);
+      if (!encrypted) return null;
+      
+      return await this.decrypt(encrypted);
+    } catch (error) {
+      console.error(`Failed to retrieve key ${id}:`, error);
+      return null;
+    }
+  }
+
+  hasKey(id) {
+    return this.encryptedData.has(id);
+  }
+
+  clearOldestKeys(count = 1) {
+    const entries = Array.from(this.encryptedData.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)
+      .slice(0, count);
     
-    executeAutoReload();
-  };
-  
-  // CORRECTION: Fonction pour vérifier les opérations wallet
-  const isWalletOperationActive = () => {
-    return isOperationActive('import') || 
-           isOperationActive('wallet-import') ||
-           isOperationActive('email-connect') ||
-           isOperationActive('generation') ||
-           isOperationActive('connection');
-  };
-  
-  const executeAutoReload = () => {
+    entries.forEach(([id]) => {
+      this.encryptedData.delete(id);
+      console.log(`[SECURITY] Cleared old key: ${id}`);
+    });
+  }
+
+  // Nouveau: Méthode pour vérifier si une opération est en cours
+  isOperationInProgress() {
+    if (typeof window !== 'undefined' && window.isOperationActive) {
+      return window.isOperationActive();
+    }
+    return false;
+  }
+
+  // Nouveau: Méthode pour vérifier si on est dans une phase d'import
+  isWalletOperationInProgress() {
+    if (typeof window !== 'undefined' && window.isOperationActive) {
+      return window.isOperationActive('import') || 
+             window.isOperationActive('wallet-import') ||
+             window.isOperationActive('email-connect') ||
+             window.isOperationActive('generation') ||
+             window.isOperationActive('connection');
+    }
+    return false;
+  }
+
+  clearAll(reason = 'unknown') {
+    try {
+      this.lastClearReason = reason;
+      console.log(`[SECURITY] All secure keys cleared (reason: ${reason})`);
+      
+      this.encryptedData.clear();
+      this.sessionKey = null;
+      
+      if (this.cleanupTimer) {
+        clearTimeout(this.cleanupTimer);
+        this.cleanupTimer = null;
+      }
+      
+      if (this.inactivityTimer) {
+        clearTimeout(this.inactivityTimer);
+        this.inactivityTimer = null;
+      }
+      
+      if (this.displayTimer) {
+        clearInterval(this.displayTimer);
+        this.displayTimer = null;
+      }
+
+      if (this.operationCheckTimer) {
+        clearInterval(this.operationCheckTimer);
+        this.operationCheckTimer = null;
+      }
+      
+      eventBus.emit(EVENTS.KEYS_CLEARED, { reason });
+      
+      // CORRECTION: Auto-reload seulement pour les vrais timeouts de sécurité
+      if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR && reason === 'security_timeout') {
+        this.scheduleAutoReload();
+      } else if (reason === 'security_timeout') {
+        console.log('[SECURITY] Security timeout detected, but auto-reload is disabled');
+      } else {
+        console.log(`[SECURITY] Keys cleared for reason: ${reason}, no auto-reload needed`);
+      }
+      
+    } catch (error) {
+      console.error('Error clearing keys:', error);
+    }
+  }
+
+  scheduleAutoReload() {
+    console.log('[SECURITY] Scheduling auto-reload check...');
+    
+    const checkAndReload = () => {
+      // Vérification plus stricte des opérations
+      if (this.isWalletOperationInProgress()) {
+        console.log('[SECURITY] Wallet operation in progress, delaying auto-reload...');
+        setTimeout(checkAndReload, 5000);
+        return;
+      }
+      
+      if (this.isOperationInProgress()) {
+        console.log('[SECURITY] General operation in progress, delaying auto-reload...');
+        setTimeout(checkAndReload, 3000);
+        return;
+      }
+      
+      this.executeAutoReload();
+    };
+    
+    // Attendre plus longtemps avant le premier check
+    setTimeout(checkAndReload, 5000);
+  }
+
+  executeAutoReload() {
     console.log('[SECURITY] Executing auto-reload...');
     
-    // Afficher un message avant le rechargement
+    // Vérification finale
+    if (this.isWalletOperationInProgress()) {
+      console.log('[SECURITY] Aborting auto-reload, wallet operation detected');
+      return;
+    }
+    
+    // Afficher une notification avant le rechargement
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -271,6 +277,7 @@ function setupAutoReloadOnKeyClear() {
         border-radius: 16px;
         text-align: center;
         box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        border: 2px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
       ">
         <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
         <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">Session expirée</div>
@@ -283,781 +290,492 @@ function setupAutoReloadOnKeyClear() {
     setTimeout(() => {
       window.location.reload();
     }, 2000);
-  };
-  
-  // CORRECTION: Écouter seulement l'événement KEYS_CLEARED avec la raison
-  eventBus.on(EVENTS.KEYS_CLEARED, handleKeyClear);
-  eventBus.on(EVENTS.SESSION_EXPIRED, () => handleKeyClear({ reason: 'session_expired' }));
-  
-  // SUPPRESSION: Retirer la surveillance des logs console qui était trop agressive
-  // Cette surveillance causait l'auto-reload lors d'opérations normales
-  console.log('[SECURITY] Auto-reload system initialized (events only, no console monitoring)');
-}
-
-// === MAIN APPLICATION CLASS ===
-export class NITOWalletApp {
-  constructor() {
-    this.dependencyManager = new DependencyManager();
-    this.initStartTime = Date.now();
-    this.modules = new Map();
-    this.eventListeners = new Map();
-    this.initialized = false;
-    this.translationRetryCount = 0;
   }
 
-  static async initialize() {
-    if (initializationPromise) return initializationPromise;
-    if (appInitialized) return Promise.resolve();
-    const app = new NITOWalletApp();
-    initializationPromise = app.start();
-    return initializationPromise;
+  setupOperationMonitoring() {
+    // Surveiller périodiquement les opérations pour un rechargement sûr
+    this.operationCheckTimer = setInterval(() => {
+      // Fonction de monitoring passive
+    }, 5000);
   }
 
-  async start() {
-    try {
-      await this.validateEnvironment();
-      await this.loadDependencies();
-      await this.initializeCore();
-      await this.setupUserInterface();
-      await this.initializeModules();
-      await this.finalizeSetup();
-      this.markAsReady();
-    } catch (error) {
-      await this.handleInitializationError(error);
-      throw error;
+  updateAccess() {
+    this.lastAccess = Date.now();
+    this.resetInactivityTimer();
+  }
+
+  setupAutoCleanup() {
+    if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
+    this.cleanupTimer = setTimeout(() => {
+      // CORRECTION: Spécifier la raison
+      this.clearAll('session_timeout');
+    }, SECURITY_CONFIG.SESSION_TIMEOUT);
+  }
+
+  setupPageHideCleanup() {
+    const cleanup = () => {
+      // CORRECTION: Spécifier la raison
+      this.clearAll('page_unload');
+      this.clearSensitiveFields();
+    };
+    
+    window.addEventListener('pagehide', cleanup);
+    window.addEventListener('beforeunload', cleanup);
+  }
+
+  setupInactivityTimer() {
+    this.resetInactivityTimer();
+    this.startTimerDisplay();
+  }
+
+  resetInactivityTimer() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+    
+    this.inactivityTimer = setTimeout(() => {
+      // CORRECTION: Spécifier la raison et ne nettoyer que les données sensibles affichées
+      this.clearSensitiveData('inactivity_timeout');
+      eventBus.emit(EVENTS.SESSION_EXPIRED);
+    }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
+  }
+
+  startTimerDisplay() {
+    if (this.displayTimer) {
+      clearInterval(this.displayTimer);
+    }
+    
+    this.displayTimer = setInterval(() => {
+      this.updateTimerDisplay();
+    }, 1000);
+  }
+
+  updateTimerDisplay() {
+    const timerElement = document.getElementById(ELEMENT_IDS.INACTIVITY_TIMER);
+    if (!timerElement) return;
+
+    const now = Date.now();
+    const elapsed = now - this.lastAccess;
+    const remaining = Math.max(0, SECURITY_CONFIG.INACTIVITY_TIMEOUT - elapsed);
+    
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    
+    timerElement.textContent = `[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}]`;
+    
+    if (remaining <= 0) {
+      clearInterval(this.displayTimer);
     }
   }
 
-  // === ENVIRONMENT VALIDATION ===
-  async validateEnvironment() {
-    const requiredAPIs = [
-      'crypto', 'fetch', 'localStorage', 'sessionStorage',
-      'URLSearchParams', 'TextEncoder', 'TextDecoder'
+  // CORRECTION: Ne pas nettoyer les clés stockées, seulement l'affichage
+  clearSensitiveData(reason = 'inactivity') {
+    const sensitiveElements = [
+      ELEMENT_IDS.HD_MASTER_KEY,
+      ELEMENT_IDS.MNEMONIC_PHRASE,
+      ELEMENT_IDS.GENERATED_ADDRESS,
+      'privateKey',
+      'privateKeyHex'
     ];
-    const missing = requiredAPIs.filter(api => !(api in window));
-    if (missing.length > 0) throw new Error(`Missing required browser APIs: ${missing.join(', ')}`);
 
-    try {
-      localStorage.setItem('test', 'test');
-      localStorage.removeItem('test');
-    } catch (_) {
-      console.warn('localStorage not available');
-    }
-  }
-
-  // === DEPENDENCY LOADING ===
-  async loadDependencies() {
-    const librariesPromise = loadExternalLibraries();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Libraries loading timeout')), 60000));
-    await Promise.race([librariesPromise, timeoutPromise]);
-    if (!areLibrariesReady()) throw new Error('Bitcoin libraries failed to initialize properly');
-  }
-
-  // === CORE INITIALIZATION ===
-  async initializeCore() {
-    await this.dependencyManager.loadModule('security', () => import('./security.js'));
-    await this.dependencyManager.loadModule('events', () => import('./events.js'));
-    await this.initializeI18nRobust();
-    this.initializeThemes();
-    this.initializeErrorHandling();
-    setupAutoReloadOnKeyClear();
-  }
-
-  // === ROBUST INTERNATIONALIZATION ===
-  async initializeI18nRobust() {
-    return new Promise((resolve) => {
-      try {
-        if (!window.i18next) { 
-          console.warn('i18next not available');
-          resolve(); 
-          return; 
-        }
-
-        const savedLng = localStorage.getItem('nito_lang') || UI_CONFIG?.DEFAULT_LANGUAGE || 'fr';
-        console.log(`[I18N] Initializing with language: ${savedLng}`);
-
-        window.i18next
-          .use(window.i18nextHttpBackend)
-          .init({
-            lng: savedLng,
-            fallbackLng: UI_CONFIG?.FALLBACK_LANGUAGE || 'en',
-            backend: {
-              loadPath: './locales/{{lng}}.json'
-            },
-            interpolation: { escapeValue: false },
-            debug: false,
-            load: 'languageOnly',
-            preload: [savedLng],
-            initImmediate: false
-          }, async (err) => {
-            if (err) { 
-              console.warn('i18next init error:', err);
-              // Essayer avec la langue de fallback
-              if (savedLng !== 'fr') {
-                await this.retryI18nWithFallback();
-              }
-              resolve(); 
-              return; 
-            }
-
-            console.log(`[I18N] Successfully initialized with: ${window.i18next.language}`);
-            
-            // Sync select initial value
-            const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-            if (sel) {
-              sel.value = window.i18next.language;
-              console.log(`[I18N] Language selector set to: ${sel.value}`);
-            }
-
-            // Apply all translations with retry mechanism
-            await this.applyTranslationsWithRetry();
-
-            // React to language changes
-            const changeLanguage = async (lng) => {
-              console.log(`[I18N] Changing language to: ${lng}`);
-              await window.i18next.changeLanguage(lng);
-              localStorage.setItem('nito_lang', lng);
-              await this.applyTranslationsWithRetry();
-              console.log(`[I18N] Language changed successfully to: ${lng}`);
-            };
-
-            // Hook on selector
-            if (sel) {
-              // Remove existing listeners
-              const newSel = sel.cloneNode(true);
-              sel.parentNode.replaceChild(newSel, sel);
-              
-              newSel.addEventListener('change', (e) => {
-                changeLanguage(e.target.value);
-              });
-            }
-
-            resolve();
-          });
-      } catch (error) {
-        console.warn('i18next setup failed:', error);
-        resolve();
-      }
-    });
-  }
-
-  async retryI18nWithFallback() {
-    try {
-      await window.i18next.changeLanguage('fr');
-      localStorage.setItem('nito_lang', 'fr');
-      console.log('[I18N] Fallback to French successful');
-    } catch (error) {
-      console.warn('[I18N] Fallback failed:', error);
-    }
-  }
-
-  async applyTranslationsWithRetry() {
-    for (let attempt = 0; attempt < UI_CONFIG.TRANSLATION_RETRY_ATTEMPTS; attempt++) {
-      try {
-        await this.updateTranslations();
-        console.log(`[I18N] Translations applied successfully on attempt ${attempt + 1}`);
-        return;
-      } catch (error) {
-        console.warn(`[I18N] Translation attempt ${attempt + 1} failed:`, error);
-        if (attempt < UI_CONFIG.TRANSLATION_RETRY_ATTEMPTS - 1) {
-          await new Promise(r => setTimeout(r, UI_CONFIG.TRANSLATION_RETRY_DELAY));
-        }
-      }
-    }
-    console.error('[I18N] All translation attempts failed');
-  }
-
-  async updateTranslations() {
-    if (!window.i18next) return;
-
-    // Attendre que les éléments DOM soient prêts
-    await new Promise(resolve => {
-      if (document.readyState === 'complete') {
-        resolve();
-      } else {
-        window.addEventListener('load', resolve, { once: true });
+    sensitiveElements.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = '';
       }
     });
 
-    // Elements with data-i18n
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-      try {
-        const key = el.getAttribute('data-i18n');
-        // Support syntax: [placeholder]foo.bar
-        if (key.startsWith('[')) {
-          const m = key.match(/^\[(.+?)\](.+)$/);
-          if (m) {
-            const [, attr, realKey] = m;
-            const t = window.i18next.t(realKey);
-            if (t && t !== realKey) el.setAttribute(attr, t);
-          }
-        } else {
-          const t = window.i18next.t(key);
-          if (t && t !== key) el.textContent = t;
-        }
-      } catch (error) {
-        console.warn(`[I18N] Failed to translate element with key: ${el.getAttribute('data-i18n')}`, error);
-      }
-    });
-
-    // Title inside <h1> (second child node text)
-    const h1 = document.querySelector('h1');
-    if (h1 && h1.childNodes[1]) {
-      const t = window.i18next.t('title');
-      if (t && t !== 'title') h1.childNodes[1].textContent = t;
-    }
-
-    // Warning block may contain markup -> sanitize if DOMPurify is present
-    const warning = document.querySelector('.warning');
-    if (warning && window.DOMPurify) {
-      const t = window.i18next.t('generate_section.warning');
-      if (t && t !== 'generate_section.warning') {
-        warning.innerHTML = window.DOMPurify.sanitize(t);
-      }
-    }
-
-    console.log('[I18N] DOM translations updated');
+    console.log(`[SECURITY] Sensitive display data cleared (reason: ${reason}), wallet keys preserved`);
+    eventBus.emit(EVENTS.INACTIVITY_WARNING);
   }
 
-  // === THEME SYSTEM ===
-  initializeThemes() {
-    const themeToggle = document.getElementById(ELEMENT_IDS.THEME_TOGGLE);
-    const root = document.documentElement;
-    const body = document.body;
-    if (!themeToggle || !root) return;
-
-    const getCurrentTheme = () => {
-      const saved = localStorage.getItem('theme');
-      if (saved === 'light' || saved === 'dark') return saved;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    };
-
-    const applyTheme = (theme, fromUser = false) => {
-      root.setAttribute('data-theme', theme);
-      body.setAttribute('data-theme', theme);
-      const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', theme === 'dark' ? '#0c0c0c' : '#ffffff');
-      themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
-      themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-      if (fromUser) localStorage.setItem('theme', theme);
-      eventBus.emit(EVENTS.UI_THEME_CHANGED, { theme });
-    };
-
-    applyTheme(getCurrentTheme());
-    themeToggle.addEventListener('click', () => {
-      const currentTheme = root.getAttribute('data-theme');
-      const next = currentTheme === 'dark' ? 'light' : 'dark';
-      applyTheme(next, true);
-    });
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light');
-    });
-  }
-
-  // === ERROR HANDLING ===
-  initializeErrorHandling() {
-    window.addEventListener('error', (event) => this.handleRuntimeError(event.error));
-    window.addEventListener('unhandledrejection', (event) => this.handleRuntimeError(event.reason));
-  }
-
-  // === USER INTERFACE SETUP ===
-  async setupUserInterface() {
-    this.setupMobileZoomControl();
-    this.setupNavigationTabs();
-    this.setupAuthenticationSystem();
-    this.setupBalanceManagement();
-    this.setupRefreshSystem();
-  }
-
-  setupMobileZoomControl() {
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/.test(navigator.userAgent);
-    if (!isMobile) return;
-
-    let isZooming = false;
-    document.addEventListener('touchstart', (e) => { if (e.touches.length === 2) isZooming = true; });
-    document.addEventListener('touchend', () => { isZooming = false; setTimeout(() => this.resetZoom(), 300); });
-    window.addEventListener('resize', () => { if (!isZooming) this.resetZoom(); });
-    setInterval(() => { if (!isZooming) this.resetZoom(); }, 500);
-  }
-
-  resetZoom() {
-    document.body.style.zoom = '0.8';
-    const viewport = document.querySelector('meta[name="viewport"]');
-    if (viewport) viewport.setAttribute('content', 'width=device-width, initial-scale=0.8, user-scalable=yes');
-  }
-
-  setupNavigationTabs() {
-    const tabs = document.querySelectorAll('#mainTabs button');
-    const showTab = (id) => {
-      document.querySelectorAll('.tab-pane').forEach(pane => { pane.style.display = pane.id === id ? 'block' : 'none'; });
-      tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === id));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    tabs.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.dataset.tab;
-        const needsImport = (target === 'tab-send' || target === 'tab-msg');
-        const isImported = !!(window.isWalletReady && window.isWalletReady());
-        if (needsImport && !isImported) {
-          const message = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
-          alert(message);
-          showTab('tab-gen');
-          return;
-        }
-        showTab(target);
-      });
-    });
-    if (typeof window !== 'undefined') window.__NITOShowTab = showTab;
-  }
-
-  setupAuthenticationSystem() {
-    const tabEmail = document.getElementById('tabEmail');
-    const tabKey = document.getElementById('tabKey');
-    const emailForm = document.getElementById('emailForm');
-    const keyForm = document.getElementById('keyForm');
-
-    if (tabEmail && tabKey && emailForm && keyForm) {
-      tabEmail.addEventListener('click', () => {
-        tabEmail.classList.add('active'); tabKey.classList.remove('active');
-        emailForm.classList.add('active'); keyForm.classList.remove('active');
-      });
-      tabKey.addEventListener('click', () => {
-        tabKey.classList.add('active'); tabEmail.classList.remove('active');
-        keyForm.classList.add('active'); emailForm.classList.remove('active');
-      });
-    }
-  }
-
-  setupBalanceManagement() {
-    const updateSendTabBalance = async () => {
-      if (isOperationActive('balance-refresh')) {
-        console.log('[BALANCE] Refresh already in progress, skipping');
-        return;
-      }
-      
-      startOperation('balance-refresh');
-      
-      try {
-        console.log('[BALANCE] updateSendTabBalance invoked');
-        const selector = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE);
-        const output = document.getElementById(ELEMENT_IDS.SEND_TAB_BALANCE);
-        if (!selector || !output) return;
-
-        const addressType = selector.value;
-        console.log('[BALANCE] addressType:', addressType);
-        let address = '';
-        if (addressType === 'p2tr') {
-          address = window.getTaprootAddress ? window.getTaprootAddress() : '';
-          console.log('[BALANCE] Taproot address:', address);
-        } else {
-          address = window.getWalletAddress ? window.getWalletAddress() : '';
-          console.log('[BALANCE] Bech32 address:', address);
-        }
-
-        if (!address) { 
-          console.warn('[BALANCE] No address for type', addressType); 
-          output.textContent = '0.00000000'; 
-          return; 
-        }
-        
-        if (window.balance) {
-          const balance = await window.balance(address);
-          console.log('[BALANCE] address', address, 'balance', balance);
-          output.textContent = (balance || 0).toFixed(8);
-        } else {
-          output.textContent = '0.00000000';
-        }
-      } catch (error) {
-        console.error('[BALANCE] Balance update error:', error);
-      } finally {
-        endOperation('balance-refresh');
-      }
-    };
-
-    if (typeof window !== 'undefined') window.updateSendTabBalance = updateSendTabBalance;
-
-    document.addEventListener('change', (ev) => {
-      if (ev.target && ev.target.id === ELEMENT_IDS.DEBIT_ADDRESS_TYPE) {
-        // Éviter le double refresh
-        setTimeout(() => updateSendTabBalance(), 200);
-      }
-    });
-
-    const sendTabButton = document.querySelector('#mainTabs button[data-tab="tab-send"]');
-    if (sendTabButton) sendTabButton.addEventListener('click', () => setTimeout(updateSendTabBalance, 100));
-  }
-
-  setupRefreshSystem() {
-    // Fonction de mise à jour complète des soldes avec animation
-    const refreshAllBalances = async () => {
-      if (isOperationActive('full-refresh')) {
-        console.log('[REFRESH] Full refresh already in progress');
-        return;
-      }
-      
-      startOperation('full-refresh');
-      
-      const t = (window.i18next && typeof window.i18next.t === 'function') 
-        ? window.i18next.t 
-        : (key, fallback) => fallback || key;
-      
-      showBalanceLoadingSpinner(true, 'loading.cache_clearing');
-      
-      try {
-        // Clear blockchain caches if available to force a true UTXO refresh
-        if (window.clearBlockchainCaches) {
-          const maybePromise = window.clearBlockchainCaches();
-          if (maybePromise && typeof maybePromise.then === 'function') {
-            await maybePromise;
-          }
-          console.log('[REFRESH] Caches cleared');
-        }
-        
-        // Attendre un peu pour que le nettoyage prenne effet
-        await new Promise(r => setTimeout(r, 800));
-        showBalanceLoadingSpinner(true, 'loading.utxo_scan');
-        
-        // Update send tab balance
-        if (typeof window.updateSendTabBalance === 'function') {
-          await window.updateSendTabBalance();
-        }
-        
-        // Update total balance display
-        if (window.getTotalBalance) {
-          const total = await window.getTotalBalance();
-          const balanceElement = document.getElementById('totalBalance');
-          if (balanceElement) {
-            balanceElement.textContent = total.toFixed(8) + ' NITO';
-          }
-        }
-        
-        // Success message
-        showBalanceLoadingSpinner(true, 'loading.balance_updated');
-        await new Promise(r => setTimeout(r, 1200));
-        
-      } catch (error) {
-        console.error('[REFRESH] Error:', error);
-        showBalanceLoadingSpinner(true, 'loading.update_error');
-        await new Promise(r => setTimeout(r, 1500));
-      } finally {
-        showBalanceLoadingSpinner(false);
-        endOperation('full-refresh');
-      }
-    };
-
-    // Export global pour les autres modules
-    if (typeof window !== 'undefined') {
-      window.refreshAllBalances = refreshAllBalances;
-      window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
-    }
-  }
-
-  // === MODULE INITIALIZATION ===
-  async initializeModules() {
-    await this.dependencyManager.loadModule('blockchain', () => import('./blockchain.js'));
-    await this.dependencyManager.loadModule('wallet', () => import('./wallet.js'));
-    await this.dependencyManager.loadModule('transactions', () => import('./transactions.js'));
-    await this.dependencyManager.loadModule('messaging', () => import('./messaging.js'));
-    await this.dependencyManager.loadModule('ui-handlers', () => import('./ui-handlers.js'));
-    await this.waitForModulesReady();
-  }
-
-  async waitForModulesReady() {
-    const maxAttempts = 30;
-    for (let attempts = 0; attempts < maxAttempts; attempts++) {
-      try {
-        if (window.rpc) {
-          const info = await window.rpc('getblockchaininfo');
-          if (info) break;
-        }
-      } catch (_) {}
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-
-  // === FINALIZATION ===
-  async finalizeSetup() {
-    await this.updateCounterDisplay();
-    this.setupPeriodicTasks();
-    this.registerServiceWorker();
-    this.setupRefreshLabels();
-    this.setupGlobalRefreshHandlers();
-  }
-
-  async updateCounterDisplay() {
-    try {
-      const counterElement = document.getElementById(ELEMENT_IDS.KEY_COUNTER);
-      if (!counterElement) return;
-      const response = await fetch(CONFIG.API.COUNTER_GET_URL);
-      if (response.ok) {
-        const data = await response.json();
-        counterElement.textContent = data.count || 0;
-      }
-    } catch (_) {}
-  }
-
-  setupPeriodicTasks() {
-    setInterval(() => { try { if (window.gc) window.gc(); } catch (_) {} }, CONFIG.SECURITY.CLEANUP_INTERVAL);
-    setInterval(() => { 
-      if (!isOperationActive() && window.clearBlockchainCaches) {
-        window.clearBlockchainCaches(); 
-      }
-    }, 600000);
-  }
-
-  registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-  }
-
-  setupRefreshLabels() {
-    const setRefreshLabels = () => {
-      try {
-        const t = (window.i18next && typeof window.i18next.t === 'function')
-          ? window.i18next.t('import_section.refresh_button', '🔄 Actualiser')
-          : '🔄 Actualiser';
-        
-        // Bouton principal section import
-        const mainBtn = document.getElementById('refreshBalanceButton');
-        if (mainBtn) {
-          mainBtn.textContent = t;
-          mainBtn.style.cssText = `
-            background: var(--success-gradient);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
-            margin: 0.5rem;
-            text-transform: none;
-            letter-spacing: normal;
-          `;
-        }
-        
-        // Bouton section envoi - même style
-        const sendBtn = document.getElementById(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE);
-        if (sendBtn) {
-          sendBtn.textContent = t;
-          sendBtn.style.cssText = `
-            background: var(--success-gradient);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
-            margin: 0.5rem;
-            text-transform: none;
-            letter-spacing: normal;
-          `;
-        }
-      } catch {}
-    };
-
-    // Application initiale
-    document.addEventListener('DOMContentLoaded', setRefreshLabels);
+  clearSensitiveFields() {
+    const fieldsToKeep = new Set([ELEMENT_IDS.WALLET_ADDRESS]);
     
-    // Réappliquer lors du changement de langue
-    if (window.i18next && typeof window.i18next.on === 'function') {
-      window.i18next.on('languageChanged', setRefreshLabels);
-    }
-    
-    // Export global
-    if (typeof window !== 'undefined') {
-      window.setRefreshLabels = setRefreshLabels;
-    }
-
-    // Appliquer immédiatement
-    setTimeout(setRefreshLabels, 100);
-  }
-
-  setupGlobalRefreshHandlers() {
-    // Gestionnaire unifié pour tous les boutons refresh
-    document.addEventListener('click', async (ev) => {
-      const btn = ev.target && ev.target.closest && ev.target.closest('button');
-      if (!btn) return;
-      
-      const isMainRefresh = (btn.id === 'refreshBalanceButton');
-      const isSendRefresh = (btn.id === ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE);
-      
-      if (!(isMainRefresh || isSendRefresh)) return;
-
-      ev.preventDefault();
-      ev.stopPropagation();
-      
-      console.log('[REFRESH] Click detected:', { source: btn.id });
-      
-      const t = (window.i18next && typeof window.i18next.t === 'function') 
-        ? window.i18next.t 
-        : (key, fallback) => fallback || key;
-      
-      // Désactiver le bouton pendant le refresh
-      const originalText = btn.textContent;
-      const originalDisabled = btn.disabled;
-      
-      btn.disabled = true;
-      btn.textContent = t('loading.refreshing', '⌛ Actualisation...');
-      btn.style.opacity = '0.7';
-      btn.style.cursor = 'not-allowed';
-      
-      try {
-        if (typeof window.refreshAllBalances === 'function') {
-          await window.refreshAllBalances();
-        }
-        console.log('[REFRESH] Completed:', { source: btn.id });
-      } catch (e) {
-        console.error('[REFRESH] Error:', e);
-      } finally {
-        // Restaurer le bouton
-        btn.disabled = originalDisabled;
-        btn.textContent = originalText;
-        btn.style.opacity = '1';
-        btn.style.cursor = 'pointer';
+    document.querySelectorAll('input[type="password"], input[type="text"], textarea').forEach(input => {
+      if (!fieldsToKeep.has(input.id)) {
+        input.value = '';
       }
     });
-
-    console.log('[SETUP] Global refresh handlers initialized');
   }
 
-  // === COMPLETION ===
-  markAsReady() {
-    appInitialized = true;
-    const initTime = Date.now() - this.initStartTime;
-    eventBus.emit(EVENTS.SYSTEM_READY, { initTime, version: VERSION.STRING, timestamp: Date.now() });
-    window.dispatchEvent(new CustomEvent('nitoWalletReady', { detail: { initTime, version: VERSION.STRING } }));
-    
-    const readyMessage = getTranslation('system.wallet_ready', 
-      `NITO Wallet prêt en ${initTime}ms - Version ${VERSION.STRING}`, 
-      { time: initTime, version: VERSION.STRING }
-    );
-    console.log(readyMessage);
-    
-    // Log des adresses si le wallet est importé
-    if (FEATURE_FLAGS.LOG_ADDRESSES && window.isWalletReady && window.isWalletReady()) {
-      this.logWalletAddresses();
-    }
-  }
-
-  logWalletAddresses() {
-    try {
-      const addresses = {
-        bech32: window.getWalletAddress ? window.getWalletAddress() : '',
-        taproot: window.getTaprootAddress ? window.getTaprootAddress() : '',
-        legacy: window.legacyAddress || '',
-        p2sh: window.p2shAddress || ''
-      };
-      
-      console.log('=== WALLET ADDRESSES ===');
-      console.log('Bech32:', addresses.bech32);
-      console.log('Bech32m (Taproot):', addresses.taproot);
-      console.log('Legacy:', addresses.legacy);
-      console.log('P2SH:', addresses.p2sh);
-      console.log('========================');
-    } catch (error) {
-      console.warn('Could not log wallet addresses:', error);
-    }
-  }
-
-  // === ERROR HANDLING ===
-  async handleInitializationError(error) {
-    const errorMessage = getTranslation('errors.initialization_failed',
-      'Échec de l\'initialisation de l\'application. Veuillez actualiser la page.');
-      
-    try {
-      const body = document.body;
-      const div = document.createElement('div');
-      div.style.cssText = `
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: #ff4444; color: white; padding: 20px; border-radius: 8px;
-        z-index: 10000; text-align: center; max-width: 90%;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      `;
-      
-      const title = getTranslation('system.initialization_error_title', 'Erreur d\'initialisation');
-      const reloadText = getTranslation('system.reload_page', 'Recharger la page');
-      const errorDetails = getTranslation('errors.error_details', 'Erreur');
-      
-      div.innerHTML = `
-        <h3>${title}</h3>
-        <p>${errorMessage}</p>
-        <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">${errorDetails}: ${error.message}</p>
-        <button onclick="location.reload()" style="
-          margin-top: 15px; padding: 10px 20px; background: white; 
-          color: #ff4444; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-          ${reloadText}
-        </button>
-      `;
-      body.appendChild(div);
-      setTimeout(() => { location.reload(); }, 10000);
-    } catch (_) {
-      const errorDetails = getTranslation('errors.error_details', 'Erreur');
-      alert(errorMessage + '\n\n' + errorDetails + ': ' + error.message);
-      setTimeout(() => location.reload(), 2000);
-    }
-    eventBus.emit(EVENTS.SYSTEM_ERROR, { type: 'initialization_error', error: error.message, timestamp: Date.now() });
-  }
-
-  handleRuntimeError(error) {
-    eventBus.emit(EVENTS.SYSTEM_ERROR, {
-      type: 'runtime_error',
-      error: (error && error.message) ? error.message : String(error),
-      timestamp: Date.now()
-    });
-  }
-
-  // === STATUS METHODS ===
-  static getStatus() {
-    return {
-      initialized: appInitialized,
-      librariesReady: areLibrariesReady(),
-      version: VERSION.STRING,
-      timestamp: Date.now()
-    };
-  }
-
-  getModuleStatus() {
-    return {
-      loaded: Array.from(this.dependencyManager.loadedModules),
-      errors: Object.fromEntries(this.dependencyManager.moduleErrors),
-      timestamp: Date.now()
-    };
+  updateLastActionTime() {
+    this.updateAccess();
   }
 }
 
-// === AUTO-INITIALIZATION ===
-const initializeApp = async () => {
+// === CREDENTIAL DERIVATION ===
+export async function deriveFromCredentials(email, password, wordCount = 24) {
   try {
-    await NITOWalletApp.initialize();
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    if (!validateInput(normalizedEmail, 'email')) {
+      const errorMsg = getTranslation('errors.enter_email_password', 'Format d\'email invalide');
+      throw new Error(errorMsg);
+    }
+    
+    if (!password || password.length < 1) {
+      const errorMsg = getTranslation('errors.enter_email_password', 'Le mot de passe ne peut pas être vide');
+      throw new Error(errorMsg);
+    }
+
+    const encoder = new TextEncoder();
+    const salt = encoder.encode('nito-mnemonic:' + normalizedEmail);
+    
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits']
+    );
+    
+    const bits = await crypto.subtle.deriveBits({
+      name: 'PBKDF2',
+      hash: 'SHA-512',
+      salt,
+      iterations: 200000
+    }, keyMaterial, wordCount === 24 ? 256 : 128);
+    
+    const entropy = Array.from(new Uint8Array(bits))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    if (!window.bip39) {
+      throw new Error('BIP39 library not available');
+    }
+    
+    return window.bip39.entropyToMnemonic(entropy);
   } catch (error) {
-    console.error('Auto-initialization failed:', error);
+    console.error('Credential derivation failed:', error);
+    throw new Error(`Failed to derive credentials: ${error.message}`);
   }
-};
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-  setTimeout(initializeApp, 100);
 }
 
-// === GLOBAL ACCESS ===
+// === ENHANCED INPUT VALIDATION ===
+export function validateInput(input, type) {
+  if (!input || typeof input !== 'string') return false;
+  
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+
+  try {
+    switch (type) {
+      case 'wif':
+        return VALIDATION_PATTERNS.WIF.test(trimmed);
+        
+      case 'hex':
+        return VALIDATION_PATTERNS.HEX_PRIVATE_KEY.test(trimmed);
+        
+      case 'xprv':
+        return VALIDATION_PATTERNS.XPRV.test(trimmed);
+        
+      case 'address':
+        return VALIDATION_PATTERNS.ADDRESS.test(trimmed);
+        
+      case 'bech32':
+        return VALIDATION_PATTERNS.BECH32_ADDRESS.test(trimmed);
+        
+      case 'bech32m':
+        return VALIDATION_PATTERNS.BECH32M_ADDRESS.test(trimmed);
+        
+      case 'amount':
+        return VALIDATION_PATTERNS.AMOUNT.test(trimmed) && parseFloat(trimmed) > 0;
+        
+      case 'mnemonic':
+        const words = trimmed.split(/\s+/);
+        return [12, 15, 18, 21, 24].includes(words.length) && words.every(word => word.length > 0);
+        
+      case 'txid':
+        return VALIDATION_PATTERNS.TXID.test(trimmed);
+        
+      case 'email':
+        return VALIDATION_PATTERNS.EMAIL.test(trimmed);
+        
+      case 'scriptHex':
+        return VALIDATION_PATTERNS.SCRIPT_HEX.test(trimmed);
+        
+      default:
+        console.warn(`Unknown validation type: ${type}`);
+        return false;
+    }
+  } catch (error) {
+    console.error(`Validation error for type ${type}:`, error);
+    return false;
+  }
+}
+
+// === INPUT TYPE DETECTION ===
+export function detectInputType(input) {
+  if (!input || typeof input !== 'string') return 'unknown';
+  
+  const trimmed = input.trim();
+  
+  if (validateInput(trimmed, 'xprv')) return 'xprv';
+  if (validateInput(trimmed, 'mnemonic')) return 'mnemonic';
+  if (validateInput(trimmed, 'wif')) return 'wif';
+  if (validateInput(trimmed, 'hex')) return 'hex';
+  
+  return 'unknown';
+}
+
+// === ENHANCED RATE LIMITER ===
+class RateLimiter {
+  constructor() {
+    this.attempts = new Map();
+  }
+  
+  check(key, maxAttempts = SECURITY_CONFIG.RATE_LIMIT_ATTEMPTS, timeWindow = SECURITY_CONFIG.RATE_LIMIT_WINDOW) {
+    const now = Date.now();
+    const attempts = this.attempts.get(key) || [];
+    
+    const recentAttempts = attempts.filter(time => now - time < timeWindow);
+    
+    if (recentAttempts.length >= maxAttempts) {
+      const oldestAttempt = Math.min(...recentAttempts);
+      const waitTime = Math.ceil((timeWindow - (now - oldestAttempt)) / 1000);
+      const errorMsg = getTranslation('security.rate_limit_exceeded', 
+        `Limite de taux dépassée. Veuillez attendre ${waitTime} secondes avant de réessayer.`,
+        { seconds: waitTime }
+      );
+      throw new Error(errorMsg);
+    }
+    
+    recentAttempts.push(now);
+    this.attempts.set(key, recentAttempts);
+    
+    if (this.attempts.size > 100) {
+      this.cleanupOldAttempts(now, timeWindow);
+    }
+  }
+  
+  cleanupOldAttempts(now, timeWindow) {
+    for (const [key, attempts] of this.attempts) {
+      const recentAttempts = attempts.filter(time => now - time < timeWindow);
+      if (recentAttempts.length === 0) {
+        this.attempts.delete(key);
+      } else {
+        this.attempts.set(key, recentAttempts);
+      }
+    }
+  }
+}
+
+// === UTILITY FUNCTIONS ===
+export function generateSecureRandom(length = 32) {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return array;
+}
+
+export async function secureHash(data, algorithm = 'SHA-256') {
+  try {
+    const encoder = new TextEncoder();
+    const buffer = typeof data === 'string' ? encoder.encode(data) : data;
+    const hashBuffer = await crypto.subtle.digest(algorithm, buffer);
+    return new Uint8Array(hashBuffer);
+  } catch (error) {
+    console.error('Hash generation failed:', error);
+    throw new Error(`Failed to generate hash: ${error.message}`);
+  }
+}
+
+// === ENHANCED CLIPBOARD OPERATIONS ===
+export function copyToClipboard(elementId) {
+  try {
+    const sensitiveIds = new Set([
+      ELEMENT_IDS.HD_MASTER_KEY,
+      ELEMENT_IDS.MNEMONIC_PHRASE,
+      'generatedBech32Address',
+      'generatedTaprootAddress',
+      'privateKey',
+      'privateKeyHex'
+    ]);
+    
+    if (sensitiveIds.has(elementId)) {
+      armInactivityTimerSafely();
+    }
+
+    const element = document.getElementById(elementId);
+    if (!element) {
+      const errorMsg = getTranslation('security.element_not_found', 'Élément non trouvé');
+      throw new Error(errorMsg);
+    }
+
+    if (element.classList.contains('blurred')) {
+      const errorMsg = getTranslation('security.please_reveal_first', 'Veuillez d\'abord révéler le contenu');
+      throw new Error(errorMsg);
+    }
+
+    const text = element.textContent || element.innerText || '';
+    if (!text.trim()) {
+      const errorMsg = getTranslation('security.nothing_to_copy', 'Rien à copier');
+      throw new Error(errorMsg);
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(() => {
+        showCopyFeedback(true);
+      }).catch(err => {
+        console.warn('Clipboard API failed, using fallback:', err);
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+    
+  } catch (error) {
+    console.error('Copy error:', error);
+    showCopyFeedback(false, error.message);
+  }
+}
+
+function fallbackCopy(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  textArea.style.top = '-999999px';
+  
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  
+  try {
+    const successful = document.execCommand('copy');
+    showCopyFeedback(successful);
+  } catch (err) {
+    console.error('Fallback copy failed:', err);
+    const errorMsg = getTranslation('security.copy_failed', 'Échec de la copie');
+    showCopyFeedback(false, errorMsg);
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
+
+function showCopyFeedback(success, message = null) {
+  const text = success 
+    ? getTranslation('security.copied', 'Copié !')
+    : (message || getTranslation('security.copy_failed', 'Échec de la copie'));
+    
+  if (window.showNotification) {
+    window.showNotification(text, success ? 'success' : 'error');
+  } else {
+    alert(text);
+  }
+}
+
+// === ENHANCED REVEAL BUTTON SETUP ===
+export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.BLUR_TIMEOUT) {
+  try {
+    const button = document.getElementById(buttonId);
+    const target = document.getElementById(targetId);
+    
+    if (!button) {
+      console.warn(`Reveal button not found: ${buttonId}`);
+      return false;
+    }
+    
+    if (!target) {
+      console.warn(`Reveal target not found: ${targetId}`);
+      return false;
+    }
+    
+    // Remove existing listeners to prevent duplicates
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+    
+    newButton.addEventListener('click', () => {
+      try {
+        armInactivityTimerSafely();
+        
+        newButton.disabled = true;
+        target.classList.remove('blurred');
+        
+        console.log(`[SECURITY] Content revealed: ${targetId}`);
+        
+        setTimeout(() => {
+          target.classList.add('blurred');
+          newButton.disabled = false;
+          console.log(`[SECURITY] Content auto-hidden: ${targetId}`);
+        }, timeout);
+      } catch (error) {
+        console.error(`Reveal button error for ${buttonId}:`, error);
+        newButton.disabled = false;
+      }
+    });
+    
+    console.log(`[SECURITY] Reveal button setup completed: ${buttonId} -> ${targetId}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to setup reveal button ${buttonId}:`, error);
+    return false;
+  }
+}
+
+// === TIMER MANAGEMENT ===
+const timerContext = new TimerContext();
+
+export function armInactivityTimerSafely() {
+  try {
+    if (timerContext.hasContext('generation')) {
+      if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
+        keyManager.updateLastActionTime();
+      }
+    }
+    
+    eventBus.emit(EVENTS.TIMER_ARM_REQUEST);
+  } catch (error) {
+    console.warn('Timer arm failed:', error);
+  }
+}
+
+export function setTimerContext(context, callback = null) {
+  timerContext.setContext(context, callback);
+}
+
+export function clearTimerContext() {
+  timerContext.clearContext();
+}
+
+// === GLOBAL INSTANCES ===
+export const keyManager = new SecureKeyManager();
+export const rateLimiter = new RateLimiter();
+
+// === EVENT LISTENERS ===
+eventBus.on(EVENTS.TIMER_ARM_REQUEST, () => {
+  if (keyManager) {
+    keyManager.updateLastActionTime();
+  }
+});
+
+eventBus.on(EVENTS.KEYS_CLEARED, (data) => {
+  console.log('[SECURITY] Keys cleared event received:', data?.reason || 'unknown reason');
+});
+
+eventBus.on(EVENTS.SESSION_EXPIRED, () => {
+  console.log('[SECURITY] Session expired event received');
+});
+
+// === GLOBAL COMPATIBILITY ===
 if (typeof window !== 'undefined') {
-  window.NITOWalletApp = NITOWalletApp;
-  window.initializeApp = initializeApp;
-  window.showLoading = showLoading;
-  window.hideLoading = hideLoading;
-  window.startOperation = startOperation;
-  window.endOperation = endOperation;
-  window.isOperationActive = isOperationActive;
+  window.copyToClipboard = copyToClipboard;
+  window.armInactivityTimerSafely = armInactivityTimerSafely;
 }
 
-export default NITOWalletApp;
+// === INITIALIZATION ===
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
+    setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
+    
+    console.log('[SECURITY] Security layer initialized - Version 2.0.0');
+  });
+} else {
+  setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
+  setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
+  
+  console.log('[SECURITY] Security layer initialized - Version 2.0.0');
+}
 
-console.log('NITO Wallet App module loaded - Version 2.0.0');
+console.log('Security module loaded - Version 2.0.0');
