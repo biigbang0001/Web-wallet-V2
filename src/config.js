@@ -2,11 +2,11 @@
 
 // === VERSION INFORMATION ===
 export const VERSION = {
-  MAJOR: 1,
+  MAJOR: 2,
   MINOR: 0,
   PATCH: 0,
   BUILD: Date.now(),
-  STRING: '1.0.0'
+  STRING: '2.0.0'
 };
 
 // === NETWORK CONFIGURATION ===
@@ -27,8 +27,9 @@ export const NODE_CONFIG = {
   URL: '/api/',
   DEBUG: false,
   TIMEOUT: 30000,
-  MAX_RETRIES: 3,
+  MAX_RETRIES: 5,
   RETRY_DELAY: 2000,
+  ERROR_500_DELAY: 2000,
   NO_503_BACKOFF_METHODS: new Set(['getrawmempool', 'getrawtransaction', 'getmempoolinfo'])
 };
 
@@ -89,7 +90,8 @@ export const SECURITY_CONFIG = {
   AES_KEY_SIZE: 32,
   AES_IV_SIZE: 12,
   RATE_LIMIT_ATTEMPTS: 5,
-  RATE_LIMIT_WINDOW: 300000
+  RATE_LIMIT_WINDOW: 300000,
+  AUTO_RELOAD_ON_CLEAR: true
 };
 
 // === UI CONFIGURATION ===
@@ -103,7 +105,9 @@ export const UI_CONFIG = {
   POPUP_DURATION: 5000,
   NOTIFICATION_TIMEOUT: 60000,
   PROGRESS_UPDATE_INTERVAL: 100,
-  CONFIRMATION_CHECK_INTERVAL: 10000
+  CONFIRMATION_CHECK_INTERVAL: 10000,
+  TRANSLATION_RETRY_ATTEMPTS: 3,
+  TRANSLATION_RETRY_DELAY: 1000
 };
 
 // === API CONFIGURATION ===
@@ -188,6 +192,7 @@ export const ELEMENT_IDS = {
 // === VALIDATION PATTERNS ===
 export const VALIDATION_PATTERNS = {
   BECH32_ADDRESS: /^nito1[02-9ac-hj-np-z]{6,87}$/,
+  BECH32M_ADDRESS: /^nito1p[02-9ac-hj-np-z]{6,87}$/,
   LEGACY_ADDRESS: /^[13][1-9A-HJ-NP-Za-km-z]{25,39}$/,
   ADDRESS: /^(nito1[02-9ac-hj-np-z]{6,87}|[13][1-9A-HJ-NP-Za-km-z]{25,39})$/,
   WIF: /^[5KL][1-9A-HJ-NP-Za-km-z]{50,51}$/,
@@ -230,7 +235,9 @@ export const ERROR_CODES = {
   INVALID_FIELDS: 'INVALID_FIELDS',
   FILL_ALL_FIELDS: 'FILL_ALL_FIELDS',
   ENTER_MESSAGE: 'ENTER_MESSAGE',
-  INVALID_BECH32: 'INVALID_BECH32'
+  INVALID_BECH32: 'INVALID_BECH32',
+  TAPROOT_NOT_SUPPORTED: 'TAPROOT_NOT_SUPPORTED',
+  OPERATION_IN_PROGRESS: 'OPERATION_IN_PROGRESS'
 };
 
 // === FEATURE FLAGS ===
@@ -240,10 +247,12 @@ export const FEATURE_FLAGS = {
   MESSAGING_ENABLED: true,
   CONSOLIDATION_ENABLED: true,
   DEBUG_MODE: false,
-  VERBOSE_LOGGING: false,
+  VERBOSE_LOGGING: true,
   FORCE_BECH32_MESSAGING: true,
   REQUIRE_SIGNATURE_VERIFICATION: true,
-  AUTO_CLEANUP_ENABLED: true
+  AUTO_CLEANUP_ENABLED: true,
+  LOG_ADDRESSES: true,
+  AUTO_RELOAD_ON_KEY_CLEAR: true
 };
 
 // === EXTERNAL LIBRARY URLS ===
@@ -255,6 +264,15 @@ export const LIBRARY_URLS = {
   SECP256K1_LAB: 'https://esm.sh/@bitcoinerlab/secp256k1@1.0.5',
   NOBLE_SECP256K1: 'https://esm.sh/@noble/secp256k1@1.7.1',
   BUFFER: 'https://esm.sh/buffer@6.0.3'
+};
+
+// === OPERATIONAL STATE TRACKING ===
+export const OPERATION_STATE = {
+  activeOperations: new Set(),
+  isTransactionInProgress: false,
+  isConsolidationInProgress: false,
+  isBalanceRefreshInProgress: false,
+  isMessagingInProgress: false
 };
 
 // === SINGLE UNIFIED CONFIGURATION EXPORT ===
@@ -272,7 +290,8 @@ export const CONFIG = {
   VALIDATION: VALIDATION_PATTERNS,
   ERRORS: ERROR_CODES,
   FEATURES: FEATURE_FLAGS,
-  LIBRARIES: LIBRARY_URLS
+  LIBRARIES: LIBRARY_URLS,
+  OPERATIONS: OPERATION_STATE
 };
 
 // === SAFE GLOBAL COMPATIBILITY ===
