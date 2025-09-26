@@ -5,6 +5,14 @@ import { CONFIG, VERSION, ELEMENT_IDS, UI_CONFIG } from './config.js';
 import { loadExternalLibraries, areLibrariesReady } from './vendor.js';
 import { eventBus, EVENTS } from './events.js';
 
+// === TRANSLATION HELPER ===
+function getTranslation(key, fallback, params = {}) {
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : () => fallback || key;
+  return t(key, { ...params, defaultValue: fallback });
+}
+
 // === LOADING MODAL SYSTEM ===
 function showLoading(message) {
   try {
@@ -404,7 +412,7 @@ export class NITOWalletApp {
         const needsImport = (target === 'tab-send' || target === 'tab-msg');
         const isImported = !!(window.isWalletReady && window.isWalletReady());
         if (needsImport && !isImported) {
-          const message = window.i18next ? window.i18next.t('errors.import_first') : 'Importez d\'abord un wallet.';
+          const message = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
           alert(message);
           showTab('tab-gen');
           return;
@@ -710,14 +718,19 @@ export class NITOWalletApp {
     const initTime = Date.now() - this.initStartTime;
     eventBus.emit(EVENTS.SYSTEM_READY, { initTime, version: VERSION.STRING, timestamp: Date.now() });
     window.dispatchEvent(new CustomEvent('nitoWalletReady', { detail: { initTime, version: VERSION.STRING } }));
-    console.log(`NITO Wallet ready in ${initTime}ms - Version ${VERSION.STRING}`);
+    
+    const readyMessage = getTranslation('system.wallet_ready', 
+      `NITO Wallet prêt en ${initTime}ms - Version ${VERSION.STRING}`, 
+      { time: initTime, version: VERSION.STRING }
+    );
+    console.log(readyMessage);
   }
 
   // === ERROR HANDLING ===
   async handleInitializationError(error) {
-    const errorMessage = window.i18next ?
-      window.i18next.t('errors.initialization_failed') :
-      'Échec de l\'initialisation de l\'application. Veuillez actualiser la page.';
+    const errorMessage = getTranslation('errors.initialization_failed',
+      'Échec de l\'initialisation de l\'application. Veuillez actualiser la page.');
+      
     try {
       const body = document.body;
       const div = document.createElement('div');
@@ -727,20 +740,26 @@ export class NITOWalletApp {
         z-index: 10000; text-align: center; max-width: 90%;
         box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       `;
+      
+      const title = getTranslation('system.initialization_error_title', 'Erreur d\'initialisation');
+      const reloadText = getTranslation('system.reload_page', 'Recharger la page');
+      const errorDetails = getTranslation('errors.error_details', 'Erreur');
+      
       div.innerHTML = `
-        <h3>Erreur d'initialisation</h3>
+        <h3>${title}</h3>
         <p>${errorMessage}</p>
-        <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Erreur: ${error.message}</p>
+        <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">${errorDetails}: ${error.message}</p>
         <button onclick="location.reload()" style="
           margin-top: 15px; padding: 10px 20px; background: white; 
           color: #ff4444; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-          Recharger la page
+          ${reloadText}
         </button>
       `;
       body.appendChild(div);
       setTimeout(() => { location.reload(); }, 10000);
     } catch (_) {
-      alert(errorMessage + '\n\nErreur: ' + error.message);
+      const errorDetails = getTranslation('errors.error_details', 'Erreur');
+      alert(errorMessage + '\n\n' + errorDetails + ': ' + error.message);
       setTimeout(() => location.reload(), 2000);
     }
     eventBus.emit(EVENTS.SYSTEM_ERROR, { type: 'initialization_error', error: error.message, timestamp: Date.now() });
