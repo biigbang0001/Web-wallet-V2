@@ -6,6 +6,14 @@ import { keyManager, validateInput, deriveFromCredentials, armInactivityTimerSaf
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
+// === TRANSLATION HELPER ===
+function getTranslation(key, fallback, params = {}) {
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : () => fallback || key;
+  return t(key, { ...params, defaultValue: fallback });
+}
+
 // Global TX tracking and popup management
 let lastTxid = null;
 window._lastConsolidationTxid = null;
@@ -41,10 +49,10 @@ async function getExplorerUrl(txid) {
   try {
     const res = await fetch('https://explorer.nito.network', { method: 'HEAD', mode: 'cors' });
     if (res.ok) return primaryUrl;
-    console.log('Primary explorer unavailable, using fallback');
+    console.log(getTranslation('explorer.primary_unavailable', 'Explorateur principal indisponible, utilisation de l\'explorateur de secours'));
     return fallbackUrl;
   } catch (e) {
-    console.error('Error checking explorer:', e);
+    console.error(getTranslation('explorer.checking_explorer', 'Erreur lors de la vérification de l\'explorateur:'), e);
     return fallbackUrl;
   }
 }
@@ -125,16 +133,21 @@ async function showSuccessPopup(txid) {
 
   const _sanitize = (html) => (typeof DOMPurify !== "undefined" && DOMPurify && DOMPurify.sanitize) ? DOMPurify.sanitize(html) : html;
 
+  const successMessage = t('popup.success_message', 'Transaction envoyée avec succès !');
+  const confirmationProgress = t('popup.confirmation_progress', 'Confirmation :');
+  const transactionId = t('popup.transaction_id', 'ID de transaction :');
+  const closeButton = t('popup.close_button', 'Fermer');
+
   popup.innerHTML = _sanitize(`
     <div style="text-align: center;">
       <div style="font-size: 2.5rem; margin-bottom: 1rem;">✅</div>
-      <p style="margin-bottom: 20px; font-weight: 700; font-size: 18px; color: ${isDarkMode ? '#4ade80' : '#10b981'};">${t('popup.success_message', 'Transaction envoyée avec succès !')}</p>
-      <p style="margin-bottom: 15px; font-size: 16px; font-weight: 600;">${t('popup.confirmation_progress', 'Confirmation :')} <span id="progress" style="font-weight: bold; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">0</span>%</p>
+      <p style="margin-bottom: 20px; font-weight: 700; font-size: 18px; color: ${isDarkMode ? '#4ade80' : '#10b981'};">${successMessage}</p>
+      <p style="margin-bottom: 15px; font-size: 16px; font-weight: 600;">${confirmationProgress} <span id="progress" style="font-weight: bold; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">0</span>%</p>
       <div style="width: 100%; background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 12px; height: 10px; margin: 15px 0; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
         <div id="progressBar" style="width: 0%; background: linear-gradient(90deg, ${isDarkMode ? '#4ade80' : '#10b981'}, ${isDarkMode ? '#22d3ee' : '#06b6d4'}); height: 100%; border-radius: 12px; transition: width 0.5s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
       </div>
       <div style="margin-bottom: 20px; padding: 12px; background: ${isDarkMode ? '#374151' : '#f8fafc'}; border-radius: 10px; border: 1px solid ${isDarkMode ? '#4b5563' : '#e2e8f0'};">
-        <p style="margin-bottom: 8px; font-size: 14px; font-weight: 600; color: ${isDarkMode ? '#9ca3af' : '#6b7280'};">${t('popup.transaction_id', 'ID de transaction :')}</p>
+        <p style="margin-bottom: 8px; font-size: 14px; font-weight: 600; color: ${isDarkMode ? '#9ca3af' : '#6b7280'};">${transactionId}</p>
         <p id="txidLink" style="font-size: 13px; word-break: break-all; font-family: 'Monaco', 'Menlo', 'Consolas', monospace; color: ${isDarkMode ? '#d1d5db' : '#374151'};">${txid}</p>
       </div>
       <button id="closeSuccessPopup" type="button" style="
@@ -148,7 +161,7 @@ async function showSuccessPopup(txid) {
         font-size: 16px; 
         transition: all 0.3s ease;
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-      ">${t('popup.close_button', 'Fermer')}</button>
+      ">${closeButton}</button>
     </div>
   `);
   document.body.appendChild(popup);
@@ -157,7 +170,7 @@ async function showSuccessPopup(txid) {
   const progressSpan = popup.querySelector('#progress');
   const progressBar = popup.querySelector('#progressBar');
   const txidLinkSpan = popup.querySelector('#txidLink');
-  const closeButton = popup.querySelector('#closeSuccessPopup');
+  const closeButtonEl = popup.querySelector('#closeSuccessPopup');
 
   const clearAll = () => {
     try { if (_successPopupTimer) clearTimeout(_successPopupTimer); } catch(_) {}
@@ -216,10 +229,10 @@ async function showSuccessPopup(txid) {
 
   updateProgress();
 
-  if (closeButton) {
-    closeButton.onclick = (e) => { e.preventDefault(); e.stopPropagation(); clearAll(); };
-    closeButton.onmouseover = () => { closeButton.style.transform = 'translateY(-2px)'; closeButton.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.6)'; };
-    closeButton.onmouseout = () => { closeButton.style.transform = 'translateY(0)'; closeButton.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'; };
+  if (closeButtonEl) {
+    closeButtonEl.onclick = (e) => { e.preventDefault(); e.stopPropagation(); clearAll(); };
+    closeButtonEl.onmouseover = () => { closeButtonEl.style.transform = 'translateY(-2px)'; closeButtonEl.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.6)'; };
+    closeButtonEl.onmouseout = () => { closeButtonEl.style.transform = 'translateY(0)'; closeButtonEl.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'; };
   }
   
   const onKey = (e) => {
@@ -261,7 +274,8 @@ export class TaprootUtils {
     const tweakedPrivateKey = window.bitcoin.crypto.privateAdd(privateKey, tweak);
     
     if (!tweakedPrivateKey) {
-      throw new Error('Invalid tweaked private key');
+      const errorMsg = getTranslation('security.invalid_tweaked_key', 'Clé privée modifiée invalide');
+      throw new Error(errorMsg);
     }
     
     const tweakedPublicKey = window.bitcoin.crypto.pointFromScalar(tweakedPrivateKey, true);
@@ -804,7 +818,8 @@ export async function genAddr(type) {
 export async function importWIF(wif) {
   try {
     if (!validateInput(wif, 'wif')) {
-      throw new Error('Invalid WIF format');
+      const errorMsg = getTranslation('security.invalid_wif_format', 'Format WIF invalide');
+      throw new Error(errorMsg);
     }
 
     const { bitcoin, ECPair } = await getBitcoinLibraries();
@@ -833,21 +848,24 @@ export async function importWIF(wif) {
       publicKey: pubkeyBuffer
     };
   } catch (error) {
-    throw new Error(`Invalid WIF: ${error.message}`);
+    const errorMsg = getTranslation('security.invalid_wif', 'WIF invalide: {{error}}', { error: error.message });
+    throw new Error(errorMsg);
   }
 }
 
 export async function importHex(hex) {
   try {
     if (!validateInput(hex, 'hex')) {
-      throw new Error('Invalid hex format - must be 64 characters');
+      const errorMsg = getTranslation('security.invalid_hex_format', 'Format hex invalide - doit contenir 64 caractères');
+      throw new Error(errorMsg);
     }
 
     const { bitcoin, ECPair } = await getBitcoinLibraries();
 
     const privateKeyBuffer = Buffer.from(hex, 'hex');
     if (privateKeyBuffer.length !== 32) {
-      throw new Error('Private key must be 32 bytes');
+      const errorMsg = getTranslation('security.private_key_32_bytes', 'La clé privée doit faire 32 octets');
+      throw new Error(errorMsg);
     }
     
     const kp = ECPair.fromPrivateKey(privateKeyBuffer, { network: NITO_NETWORK });
@@ -865,7 +883,8 @@ export async function importHex(hex) {
       publicKey: pubkeyBuffer
     };
   } catch (error) {
-    throw new Error(`Invalid hex private key: ${error.message}`);
+    const errorMsg = getTranslation('security.invalid_private_key', 'Clé privée invalide: {{error}}', { error: error.message });
+    throw new Error(errorMsg);
   }
 }
 
@@ -884,6 +903,7 @@ export async function importWallet(arg1, arg2) {
         throw new Error('Invalid email format');
       }
       
+      console.log(getTranslation('wallet.email_connection_started', 'Connexion email démarrée, génération du portefeuille...'));
       const mnemonic = await deriveFromCredentials(email, password, 24);
       const addresses = await hdManager.importHDWallet(mnemonic);
       
@@ -896,6 +916,8 @@ export async function importWallet(arg1, arg2) {
       
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType: 'email' });
+      
+      console.log(getTranslation('wallet.email_wallet_generated', 'Portefeuille email généré, calcul des soldes...'));
       
       return { 
         success: true, 
@@ -977,6 +999,8 @@ export async function importWallet(arg1, arg2) {
       
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType });
+      
+      console.log(getTranslation('wallet.import_successful_calculating', 'Import réussi, calcul des soldes...'));
                         
       return { 
         success: true, 
