@@ -14,14 +14,14 @@
     "keys_generated": "🔑 Nito keys generated:"
   },
   "generate_section": {
-    "title": "🎯 Nito Private Key Generation",
+    "title": "🎯 Generate Nito Private Key",
     "generate_button": "🎲 Generate",
     "copy": "📋 Copy",
     "reveal": "👁️ Reveal",
     "warning": "⚠️ Save the private key immediately! It will be erased after 10 minutes of inactivity or after reloading the page."
   },
   "import_section": {
-    "title": "📥 Import a wallet",
+    "title": "📥 Import Wallet",
     "import_button": "📥 Import",
     "refresh_button": "🔄 Refresh",
     "balance": "Balance:"
@@ -31,7 +31,7 @@
     "destination_placeholder": "Recipient address",
     "amount_placeholder": "Amount (NITO)",
     "fee_placeholder": "Fee (NITO)",
-    "debit_label": "Debit address:",
+    "debit_label": "Debit from address:",
     "bech32_option": "Bech32",
     "prepare_button": "🔍 Prepare",
     "broadcast_button": "✅ Broadcast transaction",
@@ -42,24 +42,24 @@
   "encrypted_messaging": {
     "title": "🔐 Encrypted Messaging",
     "publish_pubkey": "📢 Publish my public key",
-    "publish_info": "Publish your public key once to allow others to send you encrypted messages.",
+    "publish_info": "Publish your public key once so others can send you encrypted messages.",
     "write_title": "✏️ Write a message",
     "message_placeholder": "Your message (max 50000 characters)",
     "send_button": "📤 Send",
     "clear_button": "🗑️ Clear",
-    "read_title": "📬 Read messages",
+    "read_title": "📬 Read Messages",
     "refresh_messages": "🔄 Refresh messages",
     "unread_messages": "unread messages",
-    "validate_button": "✅ Confirm send",
+    "validate_button": "✅ Confirm sending",
     "cancel_button": "❌ Cancel",
-    "recipient_placeholder": "Recipient bech32 address (nito1...)"
+    "recipient_placeholder": "Recipient Bech32 address (nito1...)"
   },
   "messaging_estimated_cost": "Estimated cost: 0.0001 NITO (1 transaction)",
-  "messaging_recipient_title": "📧 Message recipient",
+  "messaging_recipient_title": "📧 Message Recipient",
   "footer": {
     "open_source": "This project is open source",
     "view_code": "View code on GitHub",
-    "official_site": "Official NITO website"
+    "official_site": "Official NITO site"
   },
   "max_button": {
     "text": "MAX"
@@ -68,16 +68,16 @@
     "copy_seed": "📑 Copy mnemonic phrase"
   },
   "errors": {
-    "initialization_failed": "App initialization failed. Please refresh the page.",
+    "initialization_failed": "Application initialization failed. Please refresh the page.",
     "import_first": "Import a wallet first.",
-    "enter_key": "Please enter a private key, mnemonic or XPRV",
+    "enter_key": "Please enter a private key, mnemonic, or XPRV",
     "import_failed": "Import failed",
     "import_error": "Import error",
     "enter_email_password": "Please enter email and password",
     "connection_failed": "Connection failed",
     "connection_error": "Connection error",
     "generation_failed": "Generation error",
-    "fill_destination_amount": "Please fill in destination address and amount",
+    "fill_destination_amount": "Please fill in the destination address and amount",
     "transaction_functions_unavailable": "Transaction functions unavailable",
     "amount_too_high": "Amount too high",
     "transaction_prep_failed": "Transaction preparation failed",
@@ -96,19 +96,19 @@
   },
   "loading": {
     "connecting": "Connecting...",
-    "wallet_setup": "Wallet setup...",
+    "wallet_setup": "Setting up wallet...",
     "refreshing": "⏛ Refreshing...",
     "importing_wallet": "Importing wallet...",
     "connecting_email": "Connecting via email...",
-    "balance_refresh": "Refreshing balance…",
+    "balance_refresh": "Refreshing balance...",
     "blockchain_scan": "Scanning blockchain...",
-    "cache_clearing": "Clearing cache...",
+    "cache_clearing": "Clearing caches...",
     "utxo_scan": "Scanning UTXOs...",
     "balance_updated": "✅ Balance updated!",
     "update_error": "❌ Update error"
   },
   "popup": {
-    "success_message": "Transaction successfully sent!",
+    "success_message": "Transaction sent successfully!",
     "confirmation_progress": "Confirmation:",
     "transaction_id": "Transaction ID:",
     "close_button": "Close",
@@ -119,20 +119,20 @@
     "button_reveal": "🔓 Reveal mnemonic phrase",
     "warning_title": "⚠️ Mnemonic phrase (24 words):",
     "copy_button": "📋 Copy",
-    "timeout_warning": "This phrase will be automatically hidden in 30 seconds",
+    "timeout_warning": "This phrase will automatically be hidden in 30 seconds",
     "button_hide": "🔒 Hide phrase",
     "copy_success": "Mnemonic phrase copied to clipboard!",
     "copy_fallback": "Mnemonic phrase copied!"
   },
   "system": {
-    "initialization_error_title": "Initialization error",
+    "initialization_error_title": "Initialization Error",
     "reload_page": "Reload page",
     "wallet_ready": "NITO Wallet ready in {{time}}ms - Version {{version}}"
   },
   "transactions": {
     "insufficient_funds_detailed": "Insufficient funds. Use the MAX button or reduce the amount by {{amount}} NITO to cover fees.",
     "insufficient_funds_after_fees": "Insufficient funds after fees",
-    "no_suitable_utxos": "No suitable mature UTXO available",
+    "no_suitable_utxos": "No suitable mature UTXOs available",
     "need_at_least_utxos": "Need at least {{count}} mature UTXOs to consolidate. Found: {{found}}",
     "consolidation_confirm": "Consolidate {{count}} UTXOs → {{batches}} UTXO(s)\nTotal: {{total}} NITO\nType: {{type}}\n\nConfirm?",
     "consolidation_completed": "Consolidation completed!\n{{original}} UTXOs → {{final}} UTXO(s)\nTransactions: {{txCount}}\nType: {{type}}",
@@ -150,10 +150,19 @@
     "copy_failed": "Copy failed",
     "copied": "Copied!",
     "invalid_private_key": "Invalid private key",
-    "invalid_hex_format": "Invalid hex format - must contain 64 characters",
+    "invalid_hex_format": "Invalid hex format - must be 64 characters",
     "private_key_32_bytes": "Private key must be 32 bytes",
     "invalid_wif_format": "Invalid WIF format",
-    "invalid_wif": "Invalid WIF: {{error}}"
+    "invalid_wif": "Invalid WIF: {{error}}",
+    "session_expired_title": "Session expired",
+    "session_expired_message": "Your session expired after 10 minutes of inactivity",
+    "auto_reload_message": "Automatic reload in progress...",
+    "session_timeout_warning": "Session timed out for security",
+    "inactivity_detected": "Inactivity detected",
+    "security_timeout": "Security timeout exceeded",
+    "auto_reload_in_progress": "Auto reload in progress...",
+    "session_will_expire": "Session will expire automatically",
+    "please_save_data": "Please save your important data"
   },
   "messaging": {
     "searching_pubkey_for": "Searching public key for:",
@@ -168,7 +177,7 @@
     "mempool_relevant_added": "Mempool: {{count}} relevant (complete) transactions added",
     "total_analyzed": "Total: {{count}} fully analyzed transactions",
     "error_retrieving_transactions": "Error retrieving transactions:",
-    "utxos_protected": "UTXOs protected: {{count}}",
+    "utxos_protected": "Protected UTXOs: {{count}}",
     "no_address_or_unknown": "Invalid or unknown address:",
     "message_reconstituted": "Message {{id}} reconstituted, size: {{size}}",
     "message_ignored_recipient": "Message {{id}} ignored (intended for {{recipient}})",
@@ -207,7 +216,7 @@
     "missing_optimized_utxos": "Preparing {{count}} missing optimized UTXOs...",
     "insufficient_utxos_no_conflict": "Insufficient UTXOs to send {{chunks}} chunks without conflict.",
     "filtered_available_utxos": "Filtered available UTXOs: {{count}}",
-    "effective_fee_rate": "Effective fee rate obtained"
+    "effective_fee_rate": "Effective fee rate achieved"
   },
   "confirmations": {
     "checking_confirmation": "Checking confirmations...",
@@ -222,12 +231,12 @@
     "scanning_received_messages": "3. Scanning received messages...",
     "messages_found": "Messages found:",
     "test_failed": "Test failed:",
-    "test_successful": "Test successful:"
+    "test_successful": "Send successful:"
   },
   "wallet": {
     "hd_wallet_generated": "HD wallet generated ({{words}} words):",
     "wallet_imported_successfully": "Wallet imported successfully:",
-    "email_wallet_connected": "Email wallet successfully connected ({{words}} words)",
+    "email_wallet_connected": "Email wallet connected successfully ({{words}} words)",
     "calculating_balances": "Calculating balances...",
     "import_successful_calculating": "Import successful, calculating balances...",
     "email_connection_started": "Email connection started, generating wallet...",
@@ -235,6 +244,6 @@
   },
   "explorer": {
     "primary_unavailable": "Primary explorer unavailable, using fallback explorer",
-    "checking_explorer": "Error checking explorer:"
+    "checking_explorer": "Error while checking explorer:"
   }
 }
