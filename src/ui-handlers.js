@@ -197,6 +197,9 @@ function setButtonLoading(buttonId, loading, originalText = null) {
 
 async function updateBalance() {
   try {
+    // ⚠️ CORRECTION: Réinitialiser le timer à chaque interaction de balance
+    armInactivityTimerSafely();
+    
     if (window.getTotalBalance) {
       const total = await window.getTotalBalance();
       const balanceElement = document.getElementById('totalBalance');
@@ -215,6 +218,9 @@ async function updateBalanceWithLoading() {
     return;
   }
   
+  // ⚠️ CORRECTION: Réinitialiser le timer lors des opérations de balance
+  armInactivityTimerSafely();
+  
   startOperation('balance-update');
   
   if (window.showBalanceLoadingSpinner) {
@@ -223,6 +229,7 @@ async function updateBalanceWithLoading() {
   
   try {
     // Nettoyer les caches blockchain pour forcer une vraie mise à jour
+    // ⚠️ CORRECTION: Ne pas déclencher d'événements de sécurité pendant le nettoyage normal
     if (window.clearBlockchainCaches) {
       const maybePromise = window.clearBlockchainCaches();
       if (maybePromise && typeof maybePromise.then === 'function') {
@@ -261,6 +268,9 @@ async function updateBalanceWithLoading() {
 }
 
 async function showSuccessPopup(txid) {
+  // ⚠️ CORRECTION: Réinitialiser le timer lors des pop-ups de succès
+  armInactivityTimerSafely();
+  
   if (window.showSuccessPopup) {
     await window.showSuccessPopup(txid);
   } else {
@@ -298,6 +308,9 @@ function clearInputFields() {
 }
 
 function displayWalletInfo(addresses, importType) {
+  // ⚠️ CORRECTION: Réinitialiser le timer lors de l'affichage des infos wallet
+  armInactivityTimerSafely();
+  
   const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
   const bech32Element = document.getElementById(ELEMENT_IDS.BECH32_ADDRESS);
   const taprootElement = document.getElementById(ELEMENT_IDS.TAPROOT_ADDRESS);
@@ -358,6 +371,9 @@ function injectConsolidateButton() {
     consolidateButton.style.marginTop = '10px';
     
     consolidateButton.addEventListener('click', async () => {
+      // ⚠️ CORRECTION: Réinitialiser le timer lors des clics sur consolidation
+      armInactivityTimerSafely();
+      
       if (isOperationActive('consolidation')) {
         console.log('[UI] Consolidation already in progress');
         return;
@@ -402,9 +418,11 @@ function createSecureSeedButton(mnemonic, containerId) {
   let revealTimeout = null;
 
   seedButton.addEventListener('click', () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la révélation de seed
+    armInactivityTimerSafely();
+    
     if (!isRevealed) {
       // Révéler la seed
-      armInactivityTimerSafely();
       
       // Créer un élément temporaire pour afficher la seed
       const seedDisplay = document.createElement('div');
@@ -438,6 +456,9 @@ function createSecureSeedButton(mnemonic, containerId) {
 
       // Bouton de copie
       document.getElementById('copySeedBtn').addEventListener('click', () => {
+        // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
+        armInactivityTimerSafely();
+        
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(mnemonic).then(() => {
             const successMsg = t('seed_reveal.copy_success', 'Phrase mnémotechnique copiée dans le presse-papiers !');
@@ -497,6 +518,9 @@ function setupGenerationHandlers() {
   console.log('[UI] Setting up generation handlers...');
   
   addUniqueEventListener(ELEMENT_IDS.GENERATE_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la génération
+    armInactivityTimerSafely();
+    
     if (isOperationActive('generation')) {
       console.log('[UI] Generation already in progress');
       return;
@@ -557,10 +581,14 @@ function setupGenerationHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_HD_KEY, 'click', () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
+    armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.HD_MASTER_KEY);
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_MNEMONIC, 'click', () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
+    armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.MNEMONIC_PHRASE);
   });
   
@@ -572,6 +600,9 @@ function setupImportHandlers() {
   console.log('[UI] Setting up import handlers...');
   
   addUniqueEventListener(ELEMENT_IDS.IMPORT_WALLET_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de l'import
+    armInactivityTimerSafely();
+    
     if (isOperationActive('import')) {
       console.log('[UI] Import already in progress');
       return;
@@ -620,6 +651,9 @@ function setupImportHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la connexion email
+    armInactivityTimerSafely();
+    
     if (isOperationActive('email-connect')) {
       console.log('[UI] Email connection already in progress');
       return;
@@ -682,6 +716,9 @@ function setupImportHandlers() {
 
   // Boutons de rafraîchissement standardisés avec déduplication
   addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors du refresh
+    armInactivityTimerSafely();
+    
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
       await updateBalanceWithLoading();
@@ -706,6 +743,9 @@ function setupAuthenticationSystem() {
 
   if (tabEmail && tabKey && emailForm && keyForm) {
     addUniqueEventListener('tabEmail', 'click', () => {
+      // ⚠️ CORRECTION: Réinitialiser le timer lors du changement d'onglet
+      armInactivityTimerSafely();
+      
       tabEmail.classList.add('active');
       tabKey.classList.remove('active');
       emailForm.classList.add('active');
@@ -718,6 +758,9 @@ function setupAuthenticationSystem() {
     });
     
     addUniqueEventListener('tabKey', 'click', () => {
+      // ⚠️ CORRECTION: Réinitialiser le timer lors du changement d'onglet
+      armInactivityTimerSafely();
+      
       tabKey.classList.add('active');
       tabEmail.classList.remove('active');
       keyForm.classList.add('active');
@@ -742,6 +785,9 @@ function setupTransactionHandlers() {
     : (key, fallback) => fallback || key;
     
   addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors du clic MAX
+    armInactivityTimerSafely();
+    
     try {
       if (!window.isWalletReady || !window.isWalletReady()) {
         const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet');
@@ -760,6 +806,9 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la préparation de transaction
+    armInactivityTimerSafely();
+    
     if (isOperationActive('transaction')) {
       console.log('[UI] Transaction already in progress');
       return;
@@ -818,6 +867,9 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.BROADCAST_TX_BUTTON, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la diffusion
+    armInactivityTimerSafely();
+    
     if (isOperationActive('broadcast')) {
       console.log('[UI] Broadcast already in progress');
       return;
@@ -867,6 +919,9 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.CANCEL_TX_BUTTON, 'click', () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de l'annulation
+    armInactivityTimerSafely();
+    
     document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
     document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
     document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
@@ -874,11 +929,16 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_TX_HEX, 'click', () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
+    armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.SIGNED_TX);
   });
 
   // Bouton de rafraîchissement standardisé dans l'onglet Envoyer avec déduplication
   addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
+    // ⚠️ CORRECTION: Réinitialiser le timer lors du refresh de l'onglet envoi
+    armInactivityTimerSafely();
+    
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
       await updateBalanceWithLoading();
