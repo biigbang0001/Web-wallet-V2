@@ -5,6 +5,14 @@ import { ELEMENT_IDS } from './config.js';
 import { copyToClipboard, armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 
+// === TRANSLATION HELPER ===
+function getTranslation(key, fallback, params = {}) {
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : () => fallback || key;
+  return t(key, { ...params, defaultValue: fallback });
+}
+
 // === LOADING SYSTEM WITH i18n ===
 function showLoadingSpinner(show) {
   const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
@@ -180,10 +188,11 @@ async function showSuccessPopup(txid) {
   if (window.showSuccessPopup) {
     await window.showSuccessPopup(txid);
   } else {
-    const t = (window.i18next && typeof window.i18next.t === 'function') 
-      ? window.i18next.t 
-      : (key, fallback) => fallback || key;
-    alert(t('popup.transaction_success', `Transaction réussie ! TXID: ${txid}`));
+    const successMsg = getTranslation('popup.transaction_success', 
+      `Transaction réussie ! TXID: ${txid}`, 
+      { txid }
+    );
+    alert(successMsg);
   }
 }
 
@@ -219,13 +228,15 @@ function displayWalletInfo(addresses, importType) {
   const addressesSection = document.getElementById('nito-addresses');
   
   if (walletAddressElement && addresses) {
+    const balanceText = getTranslation('import_section.balance', 'Solde:');
+    
     walletAddressElement.innerHTML = `
       <div style="margin-top: 10px;">
         <strong>Bech32:</strong> ${addresses.bech32}<br>
         <strong>Taproot:</strong> ${addresses.taproot}
       </div>
       <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
-        Balance: 0.00000000 NITO
+        ${balanceText} 0.00000000 NITO
       </div>
     `;
     
@@ -265,7 +276,7 @@ function injectConsolidateButton() {
         await window.consolidateUtxos();
         setTimeout(() => updateBalanceWithLoading(), 3000);
       } else {
-        const errorMsg = t('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
+        const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
         alert(errorMsg);
       }
     });
@@ -424,7 +435,11 @@ function setupGenerationHandlers() {
           console.warn('Counter update failed:', e);
         }
 
-        console.log('HD wallet generated (24 words):', {
+        const logMessage = getTranslation('wallet.hd_wallet_generated', 
+          'Portefeuille HD généré (24 mots):', 
+          { words: 24 }
+        );
+        console.log(logMessage, {
           bech32: addresses.bech32,
           taproot: addresses.taproot,
           legacy: addresses.legacy,
@@ -432,7 +447,7 @@ function setupGenerationHandlers() {
         });
       }
     } catch (error) {
-      const errorMsg = t('errors.generation_failed', `Erreur de génération: ${error.message}`);
+      const errorMsg = getTranslation('errors.generation_failed', `Erreur de génération: ${error.message}`);
       alert(errorMsg);
       console.error('Generation error:', error);
     } finally {
@@ -463,7 +478,7 @@ function setupImportHandlers() {
       
       const input = document.getElementById(ELEMENT_IDS.PRIVATE_KEY_WIF)?.value?.trim();
       if (!input) {
-        const errorMsg = t('errors.enter_key', 'Veuillez entrer une clé privée, mnemonic ou XPRV');
+        const errorMsg = getTranslation('errors.enter_key', 'Veuillez entrer une clé privée, mnemonic ou XPRV');
         alert(errorMsg);
         return;
       }
@@ -471,17 +486,20 @@ function setupImportHandlers() {
       const result = await window.importWallet(input);
       
       if (result.success) {
-        console.log('Import successful, calculating balances...');
+        const logMessage = getTranslation('wallet.import_successful_calculating', 'Import réussi, calcul des soldes...');
+        console.log(logMessage);
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
         clearInputFields();
-        console.log('Wallet imported successfully:', result.importType);
+        
+        const successMessage = getTranslation('wallet.wallet_imported_successfully', 'Portefeuille importé avec succès:');
+        console.log(successMessage, result.importType);
       } else {
-        const errorMsg = t('errors.import_failed', `Échec de l'import: ${result.error}`);
+        const errorMsg = getTranslation('errors.import_failed', `Échec de l'import: ${result.error}`);
         alert(errorMsg);
       }
     } catch (error) {
-      const errorMsg = t('errors.import_error', `Erreur d'import: ${error.message}`);
+      const errorMsg = getTranslation('errors.import_error', `Erreur d'import: ${error.message}`);
       alert(errorMsg);
       console.error('Import error:', error);
     } finally {
@@ -503,16 +521,19 @@ function setupImportHandlers() {
       const password = document.getElementById(ELEMENT_IDS.PASSWORD_INPUT)?.value?.trim();
       
       if (!email || !password) {
-        const errorMsg = t('errors.enter_email_password', 'Veuillez entrer l\'email et le mot de passe');
+        const errorMsg = getTranslation('errors.enter_email_password', 'Veuillez entrer l\'email et le mot de passe');
         alert(errorMsg);
         return;
       }
 
-      console.log('Email connection started, generating wallet...');
+      const connectionMessage = getTranslation('wallet.email_connection_started', 'Connexion email démarrée, génération du portefeuille...');
+      console.log(connectionMessage);
+      
       const result = await window.importWallet(email, password);
       
       if (result.success) {
-        console.log('Email wallet generated, calculating balances...');
+        const walletMessage = getTranslation('wallet.email_wallet_generated', 'Portefeuille email généré, calcul des soldes...');
+        console.log(walletMessage);
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
         clearInputFields();
@@ -522,13 +543,17 @@ function setupImportHandlers() {
           createSecureSeedButton(result.mnemonic, 'emailForm');
         }
         
-        console.log('Email wallet connected successfully (24 words)');
+        const successMessage = getTranslation('wallet.email_wallet_connected', 
+          'Portefeuille email connecté avec succès (24 mots)',
+          { words: 24 }
+        );
+        console.log(successMessage);
       } else {
-        const errorMsg = t('errors.connection_failed', `Échec de la connexion: ${result.error}`);
+        const errorMsg = getTranslation('errors.connection_failed', `Échec de la connexion: ${result.error}`);
         alert(errorMsg);
       }
     } catch (error) {
-      const errorMsg = t('errors.connection_error', `Erreur de connexion: ${error.message}`);
+      const errorMsg = getTranslation('errors.connection_error', `Erreur de connexion: ${error.message}`);
       alert(errorMsg);
       console.error('Connection error:', error);
     } finally {
@@ -593,7 +618,7 @@ function setupTransactionHandlers() {
   document.getElementById(ELEMENT_IDS.MAX_BUTTON)?.addEventListener('click', async () => {
     try {
       if (!window.isWalletReady || !window.isWalletReady()) {
-        const errorMsg = t('errors.import_first', 'Importez d\'abord un wallet');
+        const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet');
         alert(errorMsg);
         return;
       }
@@ -617,13 +642,13 @@ function setupTransactionHandlers() {
       const amount = parseFloat(document.getElementById(ELEMENT_IDS.AMOUNT_NITO)?.value || '0');
       
       if (!to || !amount || amount <= 0) {
-        const errorMsg = t('errors.fill_destination_amount', 'Veuillez remplir l\'adresse de destination et le montant');
+        const errorMsg = getTranslation('errors.fill_destination_amount', 'Veuillez remplir l\'adresse de destination et le montant');
         alert(errorMsg);
         return;
       }
       
       if (!window.signTxWithPSBT) {
-        const errorMsg = t('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+        const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
         throw new Error(errorMsg);
       }
       
@@ -633,7 +658,9 @@ function setupTransactionHandlers() {
         const feeReserve = 0.0005; // Reserve plus élevée pour les fees
         
         if (amount > (totalBal - feeReserve)) {
-          const errorMsg = t('errors.amount_too_high', `Montant trop élevé. Maximum: ${(totalBal - feeReserve).toFixed(8)} NITO (${feeReserve} NITO réservés pour les frais)`);
+          const errorMsg = getTranslation('errors.amount_too_high', 
+            `Montant trop élevé. Maximum: ${(totalBal - feeReserve).toFixed(8)} NITO (${feeReserve} NITO réservés pour les frais)`
+          );
           throw new Error(errorMsg);
         }
       }
@@ -648,7 +675,7 @@ function setupTransactionHandlers() {
       
       console.log('Transaction prepared successfully');
     } catch (error) {
-      const errorMsg = t('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
+      const errorMsg = getTranslation('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
       alert(errorMsg);
       console.error('Transaction preparation error:', error);
     } finally {
@@ -664,13 +691,13 @@ function setupTransactionHandlers() {
       
       const hex = document.getElementById(ELEMENT_IDS.SIGNED_TX)?.textContent;
       if (!hex) {
-        const errorMsg = t('errors.no_transaction', 'Aucune transaction à diffuser');
+        const errorMsg = getTranslation('errors.no_transaction', 'Aucune transaction à diffuser');
         alert(errorMsg);
         return;
       }
       
       if (!window.rpc) {
-        const errorMsg = t('errors.rpc_unavailable', 'Fonction RPC non disponible');
+        const errorMsg = getTranslation('errors.rpc_unavailable', 'Fonction RPC non disponible');
         throw new Error(errorMsg);
       }
       
@@ -690,7 +717,7 @@ function setupTransactionHandlers() {
       
       console.log('Transaction broadcast successfully:', txid);
     } catch (error) {
-      const errorMsg = t('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
+      const errorMsg = getTranslation('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
       alert(errorMsg);
       console.error('Broadcast error:', error);
     } finally {
