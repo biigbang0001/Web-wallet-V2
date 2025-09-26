@@ -4,6 +4,14 @@
 import { SECURITY_CONFIG, VALIDATION_PATTERNS, ELEMENT_IDS, ERROR_CODES } from './config.js';
 import { eventBus, EVENTS } from './events.js';
 
+// === TRANSLATION HELPER ===
+function getTranslation(key, fallback, params = {}) {
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : () => fallback || key;
+  return t(key, { ...params, defaultValue: fallback });
+}
+
 // === TIMER CONTEXT MANAGEMENT ===
 class TimerContext {
   constructor() {
@@ -76,7 +84,8 @@ class SecureKeyManager {
       return { iv, data: new Uint8Array(encrypted) };
     } catch (error) {
       console.error('Encryption failed:', error);
-      throw new Error('Failed to encrypt sensitive data');
+      const errorMsg = getTranslation('security.failed_to_encrypt', 'Échec du chiffrement des données sensibles');
+      throw new Error(errorMsg);
     }
   }
 
@@ -280,11 +289,13 @@ export async function deriveFromCredentials(email, password, wordCount = 24) {
     const normalizedEmail = email.trim().toLowerCase();
     
     if (!validateInput(normalizedEmail, 'email')) {
-      throw new Error('Invalid email format');
+      const errorMsg = getTranslation('errors.enter_email_password', 'Format d\'email invalide');
+      throw new Error(errorMsg);
     }
     
     if (!password || password.length < 1) {
-      throw new Error('Password cannot be empty');
+      const errorMsg = getTranslation('errors.enter_email_password', 'Le mot de passe ne peut pas être vide');
+      throw new Error(errorMsg);
     }
 
     const encoder = new TextEncoder();
@@ -396,7 +407,11 @@ class RateLimiter {
     if (recentAttempts.length >= maxAttempts) {
       const oldestAttempt = Math.min(...recentAttempts);
       const waitTime = Math.ceil((timeWindow - (now - oldestAttempt)) / 1000);
-      throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+      const errorMsg = getTranslation('security.rate_limit_exceeded', 
+        `Limite de taux dépassée. Veuillez attendre ${waitTime} secondes avant de réessayer.`,
+        { seconds: waitTime }
+      );
+      throw new Error(errorMsg);
     }
     
     recentAttempts.push(now);
@@ -456,16 +471,19 @@ export function copyToClipboard(elementId) {
 
     const element = document.getElementById(elementId);
     if (!element) {
-      throw new Error('Element not found');
+      const errorMsg = getTranslation('security.element_not_found', 'Élément non trouvé');
+      throw new Error(errorMsg);
     }
 
     if (element.classList.contains('blurred')) {
-      throw new Error('Please reveal the content first');
+      const errorMsg = getTranslation('security.please_reveal_first', 'Veuillez d\'abord révéler le contenu');
+      throw new Error(errorMsg);
     }
 
     const text = element.textContent || element.innerText || '';
     if (!text.trim()) {
-      throw new Error('Nothing to copy');
+      const errorMsg = getTranslation('security.nothing_to_copy', 'Rien à copier');
+      throw new Error(errorMsg);
     }
 
     if (navigator.clipboard && window.isSecureContext) {
@@ -501,7 +519,8 @@ function fallbackCopy(text) {
     showCopyFeedback(successful);
   } catch (err) {
     console.error('Fallback copy failed:', err);
-    showCopyFeedback(false, 'Copy failed');
+    const errorMsg = getTranslation('security.copy_failed', 'Échec de la copie');
+    showCopyFeedback(false, errorMsg);
   } finally {
     document.body.removeChild(textArea);
   }
@@ -509,8 +528,8 @@ function fallbackCopy(text) {
 
 function showCopyFeedback(success, message = null) {
   const text = success 
-    ? (window.i18next ? window.i18next.t('copied') : 'Copied!')
-    : (message || (window.i18next ? window.i18next.t('errors.copy_error') : 'Copy failed'));
+    ? getTranslation('security.copied', 'Copié !')
+    : (message || getTranslation('security.copy_failed', 'Échec de la copie'));
     
   if (window.showNotification) {
     window.showNotification(text, success ? 'success' : 'error');
