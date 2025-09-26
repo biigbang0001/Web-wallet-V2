@@ -1,7 +1,6 @@
 // UI Event Handlers for NITO Wallet
-// Connects HTML buttons to their corresponding JavaScript functions
 
-import { ELEMENT_IDS } from './config.js';
+import { ELEMENT_IDS, FEATURE_FLAGS } from './config.js';
 import { copyToClipboard, armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 
@@ -11,6 +10,68 @@ function getTranslation(key, fallback, params = {}) {
     ? window.i18next.t 
     : () => fallback || key;
   return t(key, { ...params, defaultValue: fallback });
+}
+
+// === EVENT HANDLER DEDUPLICATION ===
+const handlerRegistry = new Map();
+let setupComplete = false;
+
+function addUniqueEventListener(elementId, eventType, handler, options = {}) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.warn(`[UI] Element not found: ${elementId}`);
+    return false;
+  }
+
+  const key = `${elementId}:${eventType}`;
+  
+  // Remove existing handler if present
+  if (handlerRegistry.has(key)) {
+    const oldHandler = handlerRegistry.get(key);
+    element.removeEventListener(eventType, oldHandler);
+    handlerRegistry.delete(key);
+  }
+
+  // Add new handler
+  element.addEventListener(eventType, handler, options);
+  handlerRegistry.set(key, handler);
+  
+  console.log(`[UI] Handler registered: ${key}`);
+  return true;
+}
+
+function removeEventListener(elementId, eventType) {
+  const element = document.getElementById(elementId);
+  const key = `${elementId}:${eventType}`;
+  
+  if (handlerRegistry.has(key)) {
+    const handler = handlerRegistry.get(key);
+    if (element) {
+      element.removeEventListener(eventType, handler);
+    }
+    handlerRegistry.delete(key);
+    console.log(`[UI] Handler removed: ${key}`);
+  }
+}
+
+// === OPERATION TRACKING ===
+function isOperationActive(operationType = null) {
+  if (window.isOperationActive) {
+    return window.isOperationActive(operationType);
+  }
+  return false;
+}
+
+function startOperation(operationType) {
+  if (window.startOperation) {
+    window.startOperation(operationType);
+  }
+}
+
+function endOperation(operationType) {
+  if (window.endOperation) {
+    window.endOperation(operationType);
+  }
 }
 
 // === LOADING SYSTEM WITH i18n ===
@@ -25,6 +86,12 @@ function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
   let modal = document.getElementById('connectionLoadingModal');
   
   if (show) {
+    if (isOperationActive('connection')) {
+      console.log('[UI] Connection already in progress');
+      return;
+    }
+    startOperation('connection');
+    
     const t = (window.i18next && typeof window.i18next.t === 'function') 
       ? window.i18next.t 
       : (key, fallback) => fallback || key;
@@ -94,6 +161,7 @@ function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
     if (modal) {
       modal.style.display = 'none';
     }
+    endOperation('connection');
   }
 }
 
@@ -137,11 +205,18 @@ async function updateBalance() {
       }
     }
   } catch (error) {
-    console.error('Balance update error:', error);
+    console.error('[UI] Balance update error:', error);
   }
 }
 
 async function updateBalanceWithLoading() {
+  if (isOperationActive('balance-update')) {
+    console.log('[UI] Balance update already in progress');
+    return;
+  }
+  
+  startOperation('balance-update');
+  
   if (window.showBalanceLoadingSpinner) {
     window.showBalanceLoadingSpinner(true, 'loading.balance_refresh');
   }
@@ -158,8 +233,8 @@ async function updateBalanceWithLoading() {
     // Attendre un peu pour que le nettoyage prenne effet
     await new Promise(r => setTimeout(r, 500));
     
-    // Mise à jour des soldes
-    if (typeof window.updateSendTabBalance === 'function') {
+    // Mise à jour des soldes - ÉVITER LE DOUBLE REFRESH
+    if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
       await window.updateSendTabBalance();
     }
     
@@ -172,7 +247,7 @@ async function updateBalanceWithLoading() {
     }
     
   } catch (error) {
-    console.error('Balance update error:', error);
+    console.error('[UI] Balance update error:', error);
     if (window.showBalanceLoadingSpinner) {
       window.showBalanceLoadingSpinner(true, 'loading.update_error');
       await new Promise(r => setTimeout(r, 1500));
@@ -181,6 +256,7 @@ async function updateBalanceWithLoading() {
     if (window.showBalanceLoadingSpinner) {
       window.showBalanceLoadingSpinner(false);
     }
+    endOperation('balance-update');
   }
 }
 
@@ -247,6 +323,16 @@ function displayWalletInfo(addresses, importType) {
     }
   }
   
+  // Log des adresses comme demandé
+  if (FEATURE_FLAGS.LOG_ADDRESSES) {
+    console.log('=== WALLET ADDRESSES ===');
+    console.log('Bech32:', addresses.bech32);
+    console.log('Bech32m (Taproot):', addresses.taproot);
+    console.log('Legacy:', addresses.legacy);
+    console.log('P2SH:', addresses.p2sh);
+    console.log('========================');
+  }
+  
   // Mise à jour du solde avec animation de chargement
   setTimeout(() => {
     updateBalanceWithLoading();
@@ -272,6 +358,11 @@ function injectConsolidateButton() {
     consolidateButton.style.marginTop = '10px';
     
     consolidateButton.addEventListener('click', async () => {
+      if (isOperationActive('consolidation')) {
+        console.log('[UI] Consolidation already in progress');
+        return;
+      }
+      
       if (window.consolidateUtxos) {
         await window.consolidateUtxos();
         setTimeout(() => updateBalanceWithLoading(), 3000);
@@ -403,12 +494,20 @@ function createSecureSeedButton(mnemonic, containerId) {
 
 // === WALLET GENERATION HANDLERS ===
 function setupGenerationHandlers() {
-  document.getElementById(ELEMENT_IDS.GENERATE_BUTTON)?.addEventListener('click', async () => {
+  console.log('[UI] Setting up generation handlers...');
+  
+  addUniqueEventListener(ELEMENT_IDS.GENERATE_BUTTON, 'click', async () => {
+    if (isOperationActive('generation')) {
+      console.log('[UI] Generation already in progress');
+      return;
+    }
+    
     const t = (window.i18next && typeof window.i18next.t === 'function') 
       ? window.i18next.t 
       : (key, fallback) => fallback || key;
       
     try {
+      startOperation('generation');
       showLoadingSpinner(true);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, true);
       
@@ -432,7 +531,7 @@ function setupGenerationHandlers() {
           const data = await response.json();
           document.getElementById(ELEMENT_IDS.KEY_COUNTER).textContent = data.count || 0;
         } catch (e) {
-          console.warn('Counter update failed:', e);
+          console.warn('[UI] Counter update failed:', e);
         }
 
         const logMessage = getTranslation('wallet.hd_wallet_generated', 
@@ -449,30 +548,41 @@ function setupGenerationHandlers() {
     } catch (error) {
       const errorMsg = getTranslation('errors.generation_failed', `Erreur de génération: ${error.message}`);
       alert(errorMsg);
-      console.error('Generation error:', error);
+      console.error('[UI] Generation error:', error);
     } finally {
       showLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, false);
+      endOperation('generation');
     }
   });
 
-  document.getElementById(ELEMENT_IDS.COPY_HD_KEY)?.addEventListener('click', () => {
+  addUniqueEventListener(ELEMENT_IDS.COPY_HD_KEY, 'click', () => {
     copyToClipboard(ELEMENT_IDS.HD_MASTER_KEY);
   });
 
-  document.getElementById(ELEMENT_IDS.COPY_MNEMONIC)?.addEventListener('click', () => {
+  addUniqueEventListener(ELEMENT_IDS.COPY_MNEMONIC, 'click', () => {
     copyToClipboard(ELEMENT_IDS.MNEMONIC_PHRASE);
   });
+  
+  console.log('[UI] Generation handlers setup completed');
 }
 
 // === WALLET IMPORT HANDLERS ===
 function setupImportHandlers() {
-  document.getElementById(ELEMENT_IDS.IMPORT_WALLET_BUTTON)?.addEventListener('click', async () => {
+  console.log('[UI] Setting up import handlers...');
+  
+  addUniqueEventListener(ELEMENT_IDS.IMPORT_WALLET_BUTTON, 'click', async () => {
+    if (isOperationActive('import')) {
+      console.log('[UI] Import already in progress');
+      return;
+    }
+    
     const t = (window.i18next && typeof window.i18next.t === 'function') 
       ? window.i18next.t 
       : (key, fallback) => fallback || key;
       
     try {
+      startOperation('import');
       showConnectionLoadingSpinner(true, 'loading.importing_wallet');
       setButtonLoading(ELEMENT_IDS.IMPORT_WALLET_BUTTON, true);
       
@@ -501,19 +611,26 @@ function setupImportHandlers() {
     } catch (error) {
       const errorMsg = getTranslation('errors.import_error', `Erreur d'import: ${error.message}`);
       alert(errorMsg);
-      console.error('Import error:', error);
+      console.error('[UI] Import error:', error);
     } finally {
       showConnectionLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.IMPORT_WALLET_BUTTON, false);
+      endOperation('import');
     }
   });
 
-  document.getElementById(ELEMENT_IDS.CONNECT_EMAIL_BUTTON)?.addEventListener('click', async () => {
+  addUniqueEventListener(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, 'click', async () => {
+    if (isOperationActive('email-connect')) {
+      console.log('[UI] Email connection already in progress');
+      return;
+    }
+    
     const t = (window.i18next && typeof window.i18next.t === 'function') 
       ? window.i18next.t 
       : (key, fallback) => fallback || key;
       
     try {
+      startOperation('email-connect');
       showConnectionLoadingSpinner(true, 'loading.connecting_email');
       setButtonLoading(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, true);
       
@@ -555,35 +672,40 @@ function setupImportHandlers() {
     } catch (error) {
       const errorMsg = getTranslation('errors.connection_error', `Erreur de connexion: ${error.message}`);
       alert(errorMsg);
-      console.error('Connection error:', error);
+      console.error('[UI] Connection error:', error);
     } finally {
       showConnectionLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, false);
+      endOperation('email-connect');
     }
   });
 
-  // Boutons de rafraîchissement standardisés
-  document.getElementById(ELEMENT_IDS.REFRESH_BALANCE_BUTTON)?.addEventListener('click', async () => {
+  // Boutons de rafraîchissement standardisés avec déduplication
+  addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
       await updateBalanceWithLoading();
     } catch (error) {
-      console.error('Refresh balance error:', error);
+      console.error('[UI] Refresh balance error:', error);
     } finally {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, false);
     }
   });
+  
+  console.log('[UI] Import handlers setup completed');
 }
 
 // === AUTHENTICATION SYSTEM ===
 function setupAuthenticationSystem() {
+  console.log('[UI] Setting up authentication system...');
+  
   const tabEmail = document.getElementById('tabEmail');
   const tabKey = document.getElementById('tabKey');
   const emailForm = document.getElementById('emailForm');
   const keyForm = document.getElementById('keyForm');
 
   if (tabEmail && tabKey && emailForm && keyForm) {
-    tabEmail.addEventListener('click', () => {
+    addUniqueEventListener('tabEmail', 'click', () => {
       tabEmail.classList.add('active');
       tabKey.classList.remove('active');
       emailForm.classList.add('active');
@@ -595,7 +717,7 @@ function setupAuthenticationSystem() {
       tabEmail.style.display = 'block';
     });
     
-    tabKey.addEventListener('click', () => {
+    addUniqueEventListener('tabKey', 'click', () => {
       tabKey.classList.add('active');
       tabEmail.classList.remove('active');
       keyForm.classList.add('active');
@@ -607,15 +729,19 @@ function setupAuthenticationSystem() {
       tabKey.style.display = 'block';
     });
   }
+  
+  console.log('[UI] Authentication system setup completed');
 }
 
 // === ENHANCED TRANSACTION HANDLERS ===
 function setupTransactionHandlers() {
+  console.log('[UI] Setting up transaction handlers...');
+  
   const t = (window.i18next && typeof window.i18next.t === 'function') 
     ? window.i18next.t 
     : (key, fallback) => fallback || key;
     
-  document.getElementById(ELEMENT_IDS.MAX_BUTTON)?.addEventListener('click', async () => {
+  addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
     try {
       if (!window.isWalletReady || !window.isWalletReady()) {
         const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet');
@@ -629,12 +755,18 @@ function setupTransactionHandlers() {
         document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = maxAmount.toFixed(8);
       }
     } catch (error) {
-      console.error('MAX button error:', error);
+      console.error('[UI] MAX button error:', error);
     }
   });
 
-  document.getElementById(ELEMENT_IDS.PREPARE_TX_BUTTON)?.addEventListener('click', async () => {
+  addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
+    if (isOperationActive('transaction')) {
+      console.log('[UI] Transaction already in progress');
+      return;
+    }
+    
     try {
+      startOperation('transaction');
       showLoadingSpinner(true);
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, true);
       
@@ -673,19 +805,26 @@ function setupTransactionHandlers() {
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'inline-block';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'inline-block';
       
-      console.log('Transaction prepared successfully');
+      console.log('[UI] Transaction prepared successfully');
     } catch (error) {
       const errorMsg = getTranslation('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
       alert(errorMsg);
-      console.error('Transaction preparation error:', error);
+      console.error('[UI] Transaction preparation error:', error);
     } finally {
       showLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, false);
+      endOperation('transaction');
     }
   });
 
-  document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON)?.addEventListener('click', async () => {
+  addUniqueEventListener(ELEMENT_IDS.BROADCAST_TX_BUTTON, 'click', async () => {
+    if (isOperationActive('broadcast')) {
+      console.log('[UI] Broadcast already in progress');
+      return;
+    }
+    
     try {
+      startOperation('broadcast');
       showLoadingSpinner(true);
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, true);
       
@@ -715,48 +854,56 @@ function setupTransactionHandlers() {
       // Update balance after successful transaction
       setTimeout(() => updateBalanceWithLoading(), 2000);
       
-      console.log('Transaction broadcast successfully:', txid);
+      console.log('[UI] Transaction broadcast successfully:', txid);
     } catch (error) {
       const errorMsg = getTranslation('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
       alert(errorMsg);
-      console.error('Broadcast error:', error);
+      console.error('[UI] Broadcast error:', error);
     } finally {
       showLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, false);
+      endOperation('broadcast');
     }
   });
 
-  document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON)?.addEventListener('click', () => {
+  addUniqueEventListener(ELEMENT_IDS.CANCEL_TX_BUTTON, 'click', () => {
     document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
     document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
     document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
     document.getElementById(ELEMENT_IDS.SIGNED_TX).textContent = '';
   });
 
-  document.getElementById(ELEMENT_IDS.COPY_TX_HEX)?.addEventListener('click', () => {
+  addUniqueEventListener(ELEMENT_IDS.COPY_TX_HEX, 'click', () => {
     copyToClipboard(ELEMENT_IDS.SIGNED_TX);
   });
 
-  // Bouton de rafraîchissement standardisé dans l'onglet Envoyer
-  document.getElementById(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE)?.addEventListener('click', async () => {
+  // Bouton de rafraîchissement standardisé dans l'onglet Envoyer avec déduplication
+  addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
       await updateBalanceWithLoading();
       // Aussi mettre à jour le solde spécifique de l'onglet envoi
-      if (typeof window.updateSendTabBalance === 'function') {
+      if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
         await window.updateSendTabBalance();
       }
     } catch (error) {
-      console.error('Send tab balance refresh error:', error);
+      console.error('[UI] Send tab balance refresh error:', error);
     } finally {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, false);
     }
   });
+  
+  console.log('[UI] Transaction handlers setup completed');
 }
 
 // === MAIN SETUP FUNCTION ===
 export function setupUIHandlers() {
-  console.log('Setting up UI event handlers with i18n support...');
+  if (setupComplete) {
+    console.log('[UI] Handlers already setup, skipping...');
+    return true;
+  }
+  
+  console.log('[UI] Setting up UI event handlers with enhanced deduplication...');
   
   try {
     setupGenerationHandlers();
@@ -764,27 +911,77 @@ export function setupUIHandlers() {
     setupAuthenticationSystem();
     setupTransactionHandlers();
     
-    console.log('UI event handlers setup completed');
+    setupComplete = true;
+    console.log('[UI] All event handlers setup completed successfully');
     return true;
   } catch (error) {
-    console.error('UI handlers setup failed:', error);
+    console.error('[UI] Handlers setup failed:', error);
+    setupComplete = false;
     return false;
   }
 }
 
-// === AUTO-INITIALIZATION ===
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupUIHandlers);
-} else {
-  setupUIHandlers();
+// === CLEANUP FUNCTION ===
+export function cleanupUIHandlers() {
+  console.log('[UI] Cleaning up all event handlers...');
+  
+  handlerRegistry.forEach((handler, key) => {
+    const [elementId, eventType] = key.split(':');
+    removeEventListener(elementId, eventType);
+  });
+  
+  handlerRegistry.clear();
+  setupComplete = false;
+  
+  console.log('[UI] All event handlers cleaned up');
 }
+
+// === AUTO-INITIALIZATION WITH BETTER TIMING ===
+function initializeWhenReady() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(setupUIHandlers, 100);
+    });
+  } else {
+    setTimeout(setupUIHandlers, 100);
+  }
+}
+
+// === RE-SETUP ON LANGUAGE CHANGE ===
+if (typeof window !== 'undefined') {
+  // Listen for language change events
+  if (window.i18next && typeof window.i18next.on === 'function') {
+    window.i18next.on('languageChanged', () => {
+      console.log('[UI] Language changed, refreshing handlers...');
+      setTimeout(() => {
+        // Re-apply button labels without removing handlers
+        const buttons = document.querySelectorAll('button[data-i18n]');
+        buttons.forEach(btn => {
+          const key = btn.getAttribute('data-i18n');
+          if (key && window.i18next) {
+            const text = window.i18next.t(key);
+            if (text && text !== key) {
+              btn.textContent = text;
+            }
+          }
+        });
+      }, 100);
+    });
+  }
+}
+
+// Initialize
+initializeWhenReady();
 
 // === GLOBAL ACCESS ===
 if (typeof window !== 'undefined') {
   window.setupUIHandlers = setupUIHandlers;
+  window.cleanupUIHandlers = cleanupUIHandlers;
   window.updateBalance = updateBalance;
   window.updateBalanceWithLoading = updateBalanceWithLoading;
   window.showConnectionLoadingSpinner = showConnectionLoadingSpinner;
+  window.addUniqueEventListener = addUniqueEventListener;
+  window.removeEventListener = removeEventListener;
 }
 
-console.log('UI handlers module loaded');
+console.log('UI handlers module loaded - Version 2.0.0');
