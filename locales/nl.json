@@ -14,11 +14,11 @@
     "keys_generated": "🔑 Nito-sleutels gegenereerd:"
   },
   "generate_section": {
-    "title": "🎯 Nito privésleutel genereren",
-    "generate_button": "🎲 Genereer",
+    "title": "🎯 Nito-privésleutel genereren",
+    "generate_button": "🎲 Genereren",
     "copy": "📋 Kopiëren",
-    "reveal": "👁️ Tonen",
-    "warning": "⚠️ Bewaar de privésleutel onmiddellijk! Deze wordt verwijderd na 10 minuten inactiviteit of na het herladen van de pagina."
+    "reveal": "👁️ Weergeven",
+    "warning": "⚠️ Sla de privésleutel onmiddellijk op! Hij wordt verwijderd na 10 minuten inactiviteit of na het herladen van de pagina."
   },
   "import_section": {
     "title": "📥 Wallet importeren",
@@ -28,7 +28,7 @@
   },
   "send_section": {
     "title": "📤 NITO verzenden",
-    "destination_placeholder": "Ontvangeradres",
+    "destination_placeholder": "Ontvangstadres",
     "amount_placeholder": "Bedrag (NITO)",
     "fee_placeholder": "Kosten (NITO)",
     "debit_label": "Af te schrijven van adres:",
@@ -42,15 +42,15 @@
   "encrypted_messaging": {
     "title": "🔐 Versleutelde berichten",
     "publish_pubkey": "📢 Mijn publieke sleutel publiceren",
-    "publish_info": "Publiceer je publieke sleutel één keer zodat anderen je versleutelde berichten kunnen sturen.",
+    "publish_info": "Publiceer uw publieke sleutel één keer zodat anderen u versleutelde berichten kunnen sturen.",
     "write_title": "✏️ Bericht schrijven",
-    "message_placeholder": "Je bericht (max. 50000 tekens)",
-    "send_button": "📤 Versturen",
+    "message_placeholder": "Uw bericht (max. 50000 tekens)",
+    "send_button": "📤 Verzenden",
     "clear_button": "🗑️ Wissen",
     "read_title": "📬 Berichten lezen",
     "refresh_messages": "🔄 Berichten vernieuwen",
     "unread_messages": "ongelezen berichten",
-    "validate_button": "✅ Verzending bevestigen",
+    "validate_button": "✅ Verzenden bevestigen",
     "cancel_button": "❌ Annuleren",
     "recipient_placeholder": "Bech32-adres van ontvanger (nito1...)"
   },
@@ -58,8 +58,8 @@
   "messaging_recipient_title": "📧 Ontvanger van bericht",
   "footer": {
     "open_source": "Dit project is open source",
-    "view_code": "Bekijk de code op GitHub",
-    "official_site": "Officiële NITO-website"
+    "view_code": "Bekijk code op GitHub",
+    "official_site": "Officiële NITO-site"
   },
   "max_button": {
     "text": "MAX"
@@ -68,19 +68,19 @@
     "copy_seed": "📑 Mnemotechnische zin kopiëren"
   },
   "errors": {
-    "initialization_failed": "App-initialisatie mislukt. Vernieuw de pagina.",
+    "initialization_failed": "Initialisatie van de applicatie mislukt. Vernieuw de pagina.",
     "import_first": "Importeer eerst een wallet.",
-    "enter_key": "Voer een privésleutel, mnemonic of XPRV in",
-    "import_failed": "Import mislukt",
+    "enter_key": "Voer een privésleutel, mnemotechnische zin of XPRV in",
+    "import_failed": "Importeren mislukt",
     "import_error": "Importfout",
     "enter_email_password": "Voer e-mail en wachtwoord in",
     "connection_failed": "Verbinding mislukt",
     "connection_error": "Verbindingsfout",
-    "generation_failed": "Generatiefout",
-    "fill_destination_amount": "Vul bestemming en bedrag in",
+    "generation_failed": "Genereerfout",
+    "fill_destination_amount": "Vul het ontvangstadres en bedrag in",
     "transaction_functions_unavailable": "Transactiefuncties niet beschikbaar",
     "amount_too_high": "Bedrag te hoog",
-    "transaction_prep_failed": "Voorbereiding transactie mislukt",
+    "transaction_prep_failed": "Voorbereiden van transactie mislukt",
     "no_transaction": "Geen transactie om uit te zenden",
     "rpc_unavailable": "RPC-functie niet beschikbaar",
     "broadcast_failed": "Uitzenden mislukt",
@@ -88,8 +88,8 @@
     "error_details": "Fout"
   },
   "consolidate": {
-    "cta": "UTXOs consolideren",
-    "run": "Consolidatie uitvoeren"
+    "cta": "UTXO's consolideren",
+    "run": "Consolidatie starten"
   },
   "common": {
     "cancel": "Annuleren"
@@ -100,12 +100,12 @@
     "refreshing": "⏛ Vernieuwen...",
     "importing_wallet": "Wallet importeren...",
     "connecting_email": "Verbinden via e-mail...",
-    "balance_refresh": "Saldo vernieuwen…",
+    "balance_refresh": "Saldo vernieuwen...",
     "blockchain_scan": "Blockchain scannen...",
     "cache_clearing": "Caches wissen...",
-    "utxo_scan": "UTXOs scannen...",
+    "utxo_scan": "UTXO's scannen...",
     "balance_updated": "✅ Saldo bijgewerkt!",
-    "update_error": "❌ Updatefout"
+    "update_error": "❌ Fout bij bijwerken"
   },
   "popup": {
     "success_message": "Transactie succesvol verzonden!",
@@ -116,33 +116,33 @@
     "transaction_success": "Transactie geslaagd! TXID:"
   },
   "seed_reveal": {
-    "button_reveal": "🔓 Mnemotechnische zin tonen",
+    "button_reveal": "🔓 Mnemotechnische zin weergeven",
     "warning_title": "⚠️ Mnemotechnische zin (24 woorden):",
     "copy_button": "📋 Kopiëren",
-    "timeout_warning": "Deze zin wordt na 30 seconden automatisch verborgen",
+    "timeout_warning": "Deze zin wordt automatisch verborgen na 30 seconden",
     "button_hide": "🔒 Zin verbergen",
-    "copy_success": "Mnemotechnische zin naar klembord gekopieerd!",
+    "copy_success": "Mnemotechnische zin gekopieerd naar klembord!",
     "copy_fallback": "Mnemotechnische zin gekopieerd!"
   },
   "system": {
     "initialization_error_title": "Initialisatiefout",
     "reload_page": "Pagina herladen",
-    "wallet_ready": "NITO Wallet klaar in {{time}}ms - Versie {{version}}"
+    "wallet_ready": "NITO Wallet gereed in {{time}}ms - Versie {{version}}"
   },
   "transactions": {
     "insufficient_funds_detailed": "Onvoldoende saldo. Gebruik de MAX-knop of verlaag het bedrag met {{amount}} NITO om de kosten te dekken.",
     "insufficient_funds_after_fees": "Onvoldoende saldo na kosten",
-    "no_suitable_utxos": "Geen geschikte volwassen UTXO beschikbaar",
-    "need_at_least_utxos": "Minstens {{count}} volwassen UTXOs nodig om te consolideren. Gevonden: {{found}}",
-    "consolidation_confirm": "Consolideer {{count}} UTXOs → {{batches}} UTXO(s)\nTotaal: {{total}} NITO\nType: {{type}}\n\nBevestigen?",
-    "consolidation_completed": "Consolidatie voltooid!\n{{original}} UTXOs → {{final}} UTXO(s)\nTransacties: {{txCount}}\nType: {{type}}",
-    "no_utxos_for_consolidation": "Geen UTXOs beschikbaar voor consolidatie",
+    "no_suitable_utxos": "Geen geschikte volwassen UTXO's beschikbaar",
+    "need_at_least_utxos": "Minstens {{count}} volwassen UTXO's nodig om te consolideren. Gevonden: {{found}}",
+    "consolidation_confirm": "Consolideer {{count}} UTXO's → {{batches}} UTXO(s)\nTotaal: {{total}} NITO\nType: {{type}}\n\nBevestigen?",
+    "consolidation_completed": "Consolidatie voltooid!\n{{original}} UTXO's → {{final}} UTXO(s)\nTransacties: {{txCount}}\nType: {{type}}",
+    "no_utxos_for_consolidation": "Geen UTXO's beschikbaar voor consolidatie",
     "consolidation_error": "Consolidatiefout: {{error}}",
     "utxo_insufficient": "Onvoldoende UTXO. Vereist: {{required}}, Beschikbaar: {{available}}"
   },
   "security": {
-    "rate_limit_exceeded": "Limiet overschreden. Wacht {{seconds}} seconden voor een nieuwe poging.",
-    "failed_to_encrypt": "Versleuteling van gevoelige data mislukt",
+    "rate_limit_exceeded": "Limiet overschreden. Wacht {{seconds}} seconden voordat u het opnieuw probeert.",
+    "failed_to_encrypt": "Versleutelen van gevoelige gegevens mislukt",
     "invalid_tweaked_key": "Ongeldige aangepaste privésleutel",
     "element_not_found": "Element niet gevonden",
     "nothing_to_copy": "Niets om te kopiëren",
@@ -153,14 +153,23 @@
     "invalid_hex_format": "Ongeldig hex-formaat - moet 64 tekens bevatten",
     "private_key_32_bytes": "Privésleutel moet 32 bytes zijn",
     "invalid_wif_format": "Ongeldig WIF-formaat",
-    "invalid_wif": "Ongeldige WIF: {{error}}"
+    "invalid_wif": "Ongeldige WIF: {{error}}",
+    "session_expired_title": "Sessie verlopen",
+    "session_expired_message": "Uw sessie is verlopen na 10 minuten inactiviteit",
+    "auto_reload_message": "Automatisch herladen bezig...",
+    "session_timeout_warning": "Sessie verlopen om veiligheidsredenen",
+    "inactivity_detected": "Inactiviteit gedetecteerd",
+    "security_timeout": "Beveiligingstime-out overschreden",
+    "auto_reload_in_progress": "Automatisch herladen...",
+    "session_will_expire": "De sessie verloopt automatisch",
+    "please_save_data": "Bewaar uw belangrijke gegevens"
   },
   "messaging": {
     "searching_pubkey_for": "Zoeken naar publieke sleutel voor:",
     "no_pubkey_found_for": "Geen publieke sleutel gevonden voor:",
     "pubkey_found_validated_for": "PUBLIEKE SLEUTEL GEVONDEN EN GEVALIDEERD voor:",
     "decryption_ecdh_completed": "ECDH-decryptie voltooid, bericht geverifieerd:",
-    "encryption_ecdh_for": "ECDH-versleuteling voor:",
+    "encryption_ecdh_for": "ECDH-encryptie voor:",
     "no_transactions_found": "Geen transacties gevonden voor:",
     "analyzing_transactions": "Analyseren van {{count}} batchtransacties...",
     "batch_completed": "Batch {{current}}/{{total}} voltooid: {{valid}}/{{processed}} transacties geanalyseerd",
@@ -168,73 +177,73 @@
     "mempool_relevant_added": "Mempool: {{count}} relevante (volledige) transacties toegevoegd",
     "total_analyzed": "Totaal: {{count}} volledig geanalyseerde transacties",
     "error_retrieving_transactions": "Fout bij ophalen transacties:",
-    "utxos_protected": "UTXOs beschermd: {{count}}",
+    "utxos_protected": "Beschermde UTXO's: {{count}}",
     "no_address_or_unknown": "Ongeldig of onbekend adres:",
     "message_reconstituted": "Bericht {{id}} gereconstrueerd, grootte: {{size}}",
     "message_ignored_recipient": "Bericht {{id}} genegeerd (bestemd voor {{recipient}})",
-    "message_incomplete": "Bericht {{id}} onvolledig: {{chunks}}/{{total}} stukken",
+    "message_incomplete": "Bericht {{id}} onvolledig: {{chunks}}/{{total}} delen",
     "decryption_error": "Decryptiefout bericht {{id}}:",
     "encryption_successful": "Bericht versleuteld met ECDH + AES-GCM",
     "pubkey_published": "Publieke sleutel gepubliceerd, TXID: {{txid}}",
     "publication_error": "Publicatiefout: {{error}}",
     "no_utxo_for_pubkey": "Geen UTXO beschikbaar om publieke sleutel te publiceren",
-    "preparing_optimized_utxos": "Voorbereiden van {{count}} geoptimaliseerde UTXOs voor berichten...",
-    "split_fees": "Splitvoorbereiding kosten: {{satoshis}} satoshis ({{nito}} NITO)",
-    "estimated_fees_per_chunk": "Geschatte kosten per stuk: {{satoshis}} satoshis ({{nito}} NITO)",
-    "adaptive_utxos": "Adaptieve UTXOs: {{amount}} NITO",
-    "creating_utxos": "Aanmaken van {{count}} UTXOs van {{amount}} NITO elk",
-    "utxos_prepared": "UTXOs voorbereid, TXID: {{txid}}",
-    "waiting_new_utxos": "Wachten op nieuwe UTXOs...",
-    "utxos_available": "{{count}} specifieke geoptimaliseerde UTXOs beschikbaar!",
+    "preparing_optimized_utxos": "Voorbereiden van {{count}} geoptimaliseerde UTXO's voor berichten...",
+    "split_fees": "Splitskosten: {{satoshis}} satoshis ({{nito}} NITO)",
+    "estimated_fees_per_chunk": "Geschatte kosten per deel: {{satoshis}} satoshis ({{nito}} NITO)",
+    "adaptive_utxos": "Adaptieve UTXO's: {{amount}} NITO",
+    "creating_utxos": "Aanmaken van {{count}} UTXO's van {{amount}} NITO elk",
+    "utxos_prepared": "UTXO's voorbereid, TXID: {{txid}}",
+    "waiting_new_utxos": "Wachten op nieuwe UTXO's...",
+    "utxos_available": "{{count}} specifieke geoptimaliseerde UTXO's beschikbaar!",
     "preparation_complete": "Voorbereiding voltooid",
-    "timeout_new_utxos": "Timeout: nieuwe UTXOs niet bevestigd na 60 minuten",
-    "parallel_sending": "Parallel verzenden met {{utxos}} UTXOs voor {{chunks}} stukken",
-    "preparing_chunk": "Voorbereiden stuk {{current}}/{{total}} met UTXO {{txid}}:{{vout}} ({{amount}} NITO)",
-    "creating_all_transactions": "Alle transacties aanmaken (batch van 100)...",
+    "timeout_new_utxos": "Timeout: nieuwe UTXO's niet bevestigd na 60 minuten",
+    "parallel_sending": "Parallel verzenden met {{utxos}} UTXO's voor {{chunks}} delen",
+    "preparing_chunk": "Voorbereiden van deel {{current}}/{{total}} met UTXO {{txid}}:{{vout}} ({{amount}} NITO)",
+    "creating_all_transactions": "Aanmaken van alle transacties (batch van 100)...",
     "all_transactions_prepared": "Alle transacties voorbereid",
-    "sending_completed": "Verzenden voltooid: {{successful}}/{{total}} stukken geslaagd",
+    "sending_completed": "Verzenden voltooid: {{successful}}/{{total}} delen succesvol",
     "batch_sending": "Batch {{current}}/{{total}}: {{count}} transacties ({{remaining}} resterend)",
-    "chunk_sent": "Stuk {{current}}/{{total}} verzonden: {{txid}}",
-    "mempool_conflict": "Mempool-conflict voor stuk {{chunk}}. Geen nieuwe poging.",
-    "chunk_already_confirmed": "Stuk {{chunk}} al bevestigd",
-    "attempt_failed": "Poging {{attempt}}/{{max}} mislukt voor stuk {{chunk}}: {{error}}",
-    "chunk_abandoned": "Stuk {{chunk}} opgegeven na {{attempts}} pogingen",
+    "chunk_sent": "Deel {{current}}/{{total}} verzonden: {{txid}}",
+    "mempool_conflict": "Mempool-conflict voor deel {{chunk}}. Geen nieuwe poging.",
+    "chunk_already_confirmed": "Deel {{chunk}} al bevestigd",
+    "attempt_failed": "Poging {{attempt}}/{{max}} mislukt voor deel {{chunk}}: {{error}}",
+    "chunk_abandoned": "Deel {{chunk}} opgegeven na {{attempts}} pogingen",
     "batch_completed_results": "Batch {{batch}} voltooid: {{successes}} successen, {{failures}} mislukkingen, {{remaining}} resterend",
     "pause_before_next": "Pauze {{delay}}ms voor de volgende batch...",
     "message_sent_to": "Bericht verzonden naar:",
-    "message_divided": "Bericht verdeeld in {{chunks}} stukken",
+    "message_divided": "Bericht verdeeld in {{chunks}} delen",
     "preparation_step": "Voorbereiding",
-    "missing_optimized_utxos": "Voorbereiden van {{count}} ontbrekende geoptimaliseerde UTXOs...",
-    "insufficient_utxos_no_conflict": "Onvoldoende UTXOs om {{chunks}} stukken zonder conflict te verzenden.",
-    "filtered_available_utxos": "Gefilterde beschikbare UTXOs: {{count}}",
-    "effective_fee_rate": "Effectieve kostenratio verkregen"
+    "missing_optimized_utxos": "Voorbereiden van {{count}} ontbrekende geoptimaliseerde UTXO's...",
+    "insufficient_utxos_no_conflict": "Onvoldoende UTXO's om {{chunks}} delen zonder conflict te verzenden.",
+    "filtered_available_utxos": "Gefilterde beschikbare UTXO's: {{count}}",
+    "effective_fee_rate": "Effectieve transactiekosten behaald"
   },
   "confirmations": {
     "checking_confirmation": "Bevestigingen controleren...",
     "confirmed": "Bevestigd",
-    "pending": "In behandeling"
+    "pending": "In afwachting"
   },
   "testing": {
-    "full_messaging_test": "Volledige Noble ECDH-berichtensysteemtest",
+    "full_messaging_test": "Volledige test van het Noble ECDH-berichtensysteem",
     "publishing_pubkey": "1. Publiceren van publieke sleutel...",
-    "sending_test_message": "2. Testbericht naar jezelf sturen...",
-    "test_message_content": "Versleuteld Noble ECDH-testbericht",
+    "sending_test_message": "2. Testbericht naar uzelf verzenden...",
+    "test_message_content": "Noble ECDH versleuteld testbericht",
     "scanning_received_messages": "3. Ontvangen berichten scannen...",
     "messages_found": "Berichten gevonden:",
     "test_failed": "Test mislukt:",
-    "test_successful": "Test geslaagd:"
+    "test_successful": "Verzending geslaagd:"
   },
   "wallet": {
     "hd_wallet_generated": "HD-wallet gegenereerd ({{words}} woorden):",
     "wallet_imported_successfully": "Wallet succesvol geïmporteerd:",
     "email_wallet_connected": "E-mailwallet succesvol verbonden ({{words}} woorden)",
     "calculating_balances": "Saldi berekenen...",
-    "import_successful_calculating": "Import geslaagd, saldi berekenen...",
-    "email_connection_started": "E-mailverbinding gestart, wallet genereren...",
+    "import_successful_calculating": "Import succesvol, saldi berekenen...",
+    "email_connection_started": "E-mailverbinding gestart, wallet wordt gegenereerd...",
     "email_wallet_generated": "E-mailwallet gegenereerd, saldi berekenen..."
   },
   "explorer": {
-    "primary_unavailable": "Primaire explorer niet beschikbaar, fallback explorer gebruiken",
+    "primary_unavailable": "Primaire explorer niet beschikbaar, gebruik fallback-explorer",
     "checking_explorer": "Fout bij controleren van explorer:"
   }
 }
