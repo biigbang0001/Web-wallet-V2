@@ -100,6 +100,9 @@ async function checkTransactionConfirmation(txid) {
 
 // === UNIFIED SUCCESS POPUP SYSTEM WITH i18n ===
 async function showSuccessPopup(txid) {
+  // ⚠️ IMPORTANT: Réinitialiser le timer d'inactivité lors de la confirmation
+  armInactivityTimerSafely();
+  
   // Cleanup existing popup/timers
   try {
     if (_successPopupTimer) { clearTimeout(_successPopupTimer); _successPopupTimer = null; }
@@ -193,6 +196,9 @@ async function showSuccessPopup(txid) {
   const closeButtonEl = popup.querySelector('#closeSuccessPopup');
 
   const clearAll = () => {
+    // ⚠️ IMPORTANT: Réinitialiser le timer lors de la fermeture
+    armInactivityTimerSafely();
+    
     try { if (_successPopupTimer) clearTimeout(_successPopupTimer); } catch(_) {}
     _successPopupTimer = null;
     if (_successPopupEl && _successPopupEl.parentNode) {
@@ -233,6 +239,9 @@ async function showSuccessPopup(txid) {
         if (txidLinkSpan) {
           txidLinkSpan.innerHTML = `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" style="color: ${isDarkMode ? '#60a5fa' : '#2563eb'}; text-decoration: underline; font-weight: 600;">${txid}</a>`;
         }
+        
+        // ⚠️ IMPORTANT: Réinitialiser le timer après confirmation
+        armInactivityTimerSafely();
         
         // Auto-refresh balance after confirmation
         setTimeout(() => {
@@ -376,6 +385,9 @@ export class HDWalletManager {
 
   async generateMnemonic(wordCount = 24) {
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de la génération
+      armInactivityTimerSafely();
+      
       const { bip39 } = await getBitcoinLibraries();
       
       const entropyBits = wordCount === 24 ? 256 : 128;
@@ -397,6 +409,9 @@ export class HDWalletManager {
     startOperation('wallet-import');
     
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'import
+      armInactivityTimerSafely();
+      
       const { bitcoin, bip32, bip39 } = await getBitcoinLibraries();
       let seed;
       
@@ -470,6 +485,9 @@ export class HDWalletManager {
     }
 
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer pendant la dérivation
+      armInactivityTimerSafely();
+      
       const { bitcoin, ECPair } = window;
       if (!bitcoin || !ECPair) {
         throw new Error('Bitcoin libraries not available');
@@ -593,6 +611,9 @@ export class HDWalletManager {
   }
 
   async scanHdUtxosForFamily(family) {
+    // ⚠️ IMPORTANT: Réinitialiser le timer pendant le scan UTXO
+    armInactivityTimerSafely();
+    
     console.log(`[UTXO_SCAN] Scanning ${family} family for HD wallet...`);
     const allUtxos = [];
     const seen = new Set();
@@ -636,6 +657,11 @@ export class HDWalletManager {
           if (keyInfo.redeemScript) enriched.redeemScript = keyInfo.redeemScript;
         }
         allUtxos.push(enriched);
+      }
+      
+      // ⚠️ IMPORTANT: Réinitialiser le timer à chaque chunk pour les longs scans
+      if (chunk % 5 === 0) {
+        armInactivityTimerSafely();
       }
     }
 
@@ -718,6 +744,9 @@ export class HDWalletManager {
   }
 
   async utxosAllForBech32() {
+    // ⚠️ IMPORTANT: Réinitialiser le timer pendant le scan cumulatif
+    armInactivityTimerSafely();
+    
     console.log('[UTXO_SCAN] Scanning all families for Bech32 cumulative balance...');
     const families = ['bech32', 'p2sh', 'legacy'];
     const parts = [];
@@ -727,6 +756,9 @@ export class HDWalletManager {
         const familyUtxos = await this.scanHdUtxosForFamily(fam); 
         parts.push(familyUtxos);
         console.log(`[UTXO_SCAN] ${fam}: ${familyUtxos.length} UTXOs`);
+        
+        // ⚠️ IMPORTANT: Réinitialiser le timer entre les familles
+        armInactivityTimerSafely();
       } catch (e) {
         console.warn(`[UTXO_SCAN] Failed to scan ${fam}:`, e);
         parts.push([]);
@@ -749,6 +781,9 @@ export class HDWalletManager {
   }
 
   async utxosForTaproot() {
+    // ⚠️ IMPORTANT: Réinitialiser le timer pendant le scan Taproot
+    armInactivityTimerSafely();
+    
     console.log('[UTXO_SCAN] Scanning Taproot UTXOs specifically...');
     return await this.scanHdUtxosForFamily('taproot');
   }
@@ -777,6 +812,9 @@ class WalletState {
 
   setupEventListeners() {
     eventBus.on(EVENTS.WALLET_INFO_REQUEST, () => {
+      // ⚠️ IMPORTANT: Chaque requête d'info réinitialise le timer
+      armInactivityTimerSafely();
+      
       eventBus.emit(EVENTS.WALLET_INFO_RESPONSE, {
         address: this.bech32Address,
         isReady: this.isReady(),
@@ -795,12 +833,26 @@ class WalletState {
   }
 
   updateLastActionTime() {
+    // ⚠️ IMPORTANT: Méthode améliorée pour bien réinitialiser le timer
     this.lastActionTime = Date.now();
-    if (this.inactivityTimeout) clearTimeout(this.inactivityTimeout);
-    this.inactivityTimeout = setTimeout(() => this.clearSensitiveData(), SECURITY_CONFIG.INACTIVITY_TIMEOUT);
+    
+    // Clear le timer existant
+    if (this.inactivityTimeout) {
+      clearTimeout(this.inactivityTimeout);
+      this.inactivityTimeout = null;
+    }
+    
+    // Créer un nouveau timer de 10 minutes
+    this.inactivityTimeout = setTimeout(() => {
+      console.log('[SECURITY] Inactivity timeout reached - clearing sensitive display data only');
+      this.clearSensitiveData();
+    }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
+    
+    console.log(`[SECURITY] Inactivity timer reset to ${SECURITY_CONFIG.INACTIVITY_TIMEOUT / 60000} minutes`);
   }
 
   clearSensitiveData() {
+    // ⚠️ IMPORTANT: Ne nettoyer que l'affichage, PAS les clés stockées
     const elements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -811,10 +863,16 @@ class WalletState {
 
     elements.forEach(id => {
       const element = document.getElementById(id);
-      if (element) element.textContent = '';
+      if (element) {
+        element.textContent = '';
+        element.classList.add('blurred');
+      }
     });
 
-    eventBus.emit(EVENTS.KEYS_CLEARED);
+    console.log('[SECURITY] Sensitive display data cleared due to inactivity - wallet keys preserved');
+    eventBus.emit(EVENTS.INACTIVITY_WARNING);
+    
+    // ⚠️ IMPORTANT: NE PAS émettre KEYS_CLEARED qui déclencherait l'auto-reload
   }
 
   isReady() {
@@ -823,6 +881,9 @@ class WalletState {
 
   async getWalletKeyPair() {
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès aux clés
+      armInactivityTimerSafely();
+      
       const keyData = await keyManager.getKey('bech32KeyPair');
       if (!keyData) return null;
       
@@ -835,6 +896,9 @@ class WalletState {
 
   async getWalletPublicKey() {
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès aux clés
+      armInactivityTimerSafely();
+      
       const keyData = await keyManager.getKey('bech32KeyPair');
       if (!keyData) return null;
       return Buffer.from(keyData.publicKey, 'hex');
@@ -845,6 +909,9 @@ class WalletState {
 
   async getTaprootKeyPair() {
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès aux clés
+      armInactivityTimerSafely();
+      
       const keyData = await keyManager.getKey('taprootKeyPair');
       if (!keyData) return null;
       
@@ -858,6 +925,9 @@ class WalletState {
 
   async getTaprootPublicKey() {
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès aux clés
+      armInactivityTimerSafely();
+      
       const keyData = await keyManager.getKey('taprootKeyPair');
       if (!keyData) return null;
       return Buffer.from(keyData.publicKey, 'hex');
@@ -876,6 +946,9 @@ class WalletState {
     startOperation('balance-update');
     
     try {
+      // ⚠️ IMPORTANT: Réinitialiser le timer pendant la mise à jour du solde
+      armInactivityTimerSafely();
+      
       let total = 0;
       
       if (window.balance) {
@@ -885,12 +958,18 @@ class WalletState {
           const bech32Balance = await window.balance(this.bech32Address, this.importType === 'hd', this.importType === 'hd' ? hdManager.hdWallet : null);
           total += bech32Balance || 0;
           console.log(`[BALANCE] Bech32 balance: ${bech32Balance} NITO`);
+          
+          // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul bech32
+          armInactivityTimerSafely();
         }
         
         if (this.taprootAddress && this.importType === 'hd') {
           const taprootBalance = await window.balance(this.taprootAddress, true, hdManager.hdWallet);
           total += taprootBalance || 0;
           console.log(`[BALANCE] Taproot balance: ${taprootBalance} NITO`);
+          
+          // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul taproot
+          armInactivityTimerSafely();
         }
         
         console.log(`[BALANCE] Total balance: ${total} NITO`);
@@ -910,6 +989,9 @@ class WalletState {
 // === ADDRESS GENERATION FUNCTIONS ===
 export async function genAddr(type) {
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer lors de la génération d'adresse
+    armInactivityTimerSafely();
+    
     if (!['legacy', 'p2sh', 'bech32'].includes(type)) {
       throw new Error('Invalid address type');
     }
@@ -943,6 +1025,9 @@ export async function genAddr(type) {
 
 export async function importWIF(wif) {
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'import WIF
+    armInactivityTimerSafely();
+    
     if (!validateInput(wif, 'wif')) {
       const errorMsg = getTranslation('security.invalid_wif_format', 'Format WIF invalide');
       throw new Error(errorMsg);
@@ -991,6 +1076,9 @@ export async function importWIF(wif) {
 
 export async function importHex(hex) {
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'import hex
+    armInactivityTimerSafely();
+    
     if (!validateInput(hex, 'hex')) {
       const errorMsg = getTranslation('security.invalid_hex_format', 'Format hex invalide - doit contenir 64 caractères');
       throw new Error(errorMsg);
@@ -1037,6 +1125,9 @@ export async function importHex(hex) {
 // === UNIFIED IMPORT FUNCTION ===
 export async function importWallet(arg1, arg2) {
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer au début de l'import
+    armInactivityTimerSafely();
+    
     if (typeof arg2 === 'string' && typeof arg1 === 'string') {
       const email = arg1.trim().toLowerCase();
       const password = arg2.trim();
@@ -1051,6 +1142,10 @@ export async function importWallet(arg1, arg2) {
       
       console.log(getTranslation('wallet.email_connection_started', 'Connexion email démarrée, génération du portefeuille...'));
       const mnemonic = await deriveFromCredentials(email, password, 24);
+      
+      // ⚠️ IMPORTANT: Réinitialiser le timer après la dérivation
+      armInactivityTimerSafely();
+      
       const addresses = await hdManager.importHDWallet(mnemonic);
       
       walletState.legacyAddress = addresses.legacy;
@@ -1193,6 +1288,9 @@ export async function utxos(addr, isHD = false, hdWallet = null) {
   startOperation('utxo-scan');
   
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer pendant le scan UTXO
+    armInactivityTimerSafely();
+    
     console.log(`[UTXO] Scanning UTXOs for address: ${addr}, HD: ${isHD}`);
     
     if (isHD && hdWallet) {
@@ -1240,6 +1338,9 @@ export async function balance(addr, isHD = false, hdWallet = null) {
   }
 
   try {
+    // ⚠️ IMPORTANT: Réinitialiser le timer pendant le calcul du solde
+    armInactivityTimerSafely();
+    
     console.log(`[BALANCE] Calculating balance for: ${addr}, HD: ${isHD}`);
     
     if (isHD && hdWallet) {
@@ -1251,17 +1352,26 @@ export async function balance(addr, isHD = false, hdWallet = null) {
         const utxoList = await hdManager.utxosAllForBech32();
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Cumulative balance: ${total} NITO`);
+        
+        // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul
+        armInactivityTimerSafely();
         return total;
       } else if (addressType === 'p2tr') {
         console.log('[BALANCE] Taproot balance calculation');
         const utxoList = await hdManager.utxosForTaproot();
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Taproot balance: ${total} NITO`);
+        
+        // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul
+        armInactivityTimerSafely();
         return total;
       } else {
         const utxoList = await utxos(addr, true, hdWallet);
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Standard balance: ${total} NITO`);
+        
+        // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul
+        armInactivityTimerSafely();
         return total;
       }
     } else {
@@ -1269,6 +1379,9 @@ export async function balance(addr, isHD = false, hdWallet = null) {
       const scan = await window.rpc('scantxoutset', ['start', [`addr(${addr})`]]);
       const balance = (scan && scan.total_amount) || 0;
       console.log(`[BALANCE] Single address balance: ${balance} NITO`);
+      
+      // ⚠️ IMPORTANT: Réinitialiser le timer après le calcul
+      armInactivityTimerSafely();
       return balance;
     }
   } catch (error) {
@@ -1283,10 +1396,14 @@ export function isWalletReady() {
 }
 
 export function getWalletAddress() {
+  // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès à l'adresse
+  armInactivityTimerSafely();
   return walletState.bech32Address;
 }
 
 export function getTaprootAddress() {
+  // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès à l'adresse
+  armInactivityTimerSafely();
   return walletState.taprootAddress;
 }
 
@@ -1299,6 +1416,8 @@ export async function getWalletPublicKey() {
 }
 
 export async function getBech32Address() {
+  // ⚠️ IMPORTANT: Réinitialiser le timer lors de l'accès à l'adresse
+  armInactivityTimerSafely();
   return walletState.bech32Address;
 }
 
@@ -1316,6 +1435,9 @@ export async function getTaprootPublicKey() {
 
 // === INACTIVITY TIMER ===
 export function updateInactivityTimer() {
+  // ⚠️ IMPORTANT: Utiliser la méthode améliorée du WalletState
+  walletState.updateLastActionTime();
+  
   if (walletState.timerInterval) {
     clearInterval(walletState.timerInterval);
   }
