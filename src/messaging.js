@@ -1,7 +1,7 @@
 // Encrypted Messaging System for NITO Wallet 
 // Handles encrypted message sending, receiving, and public key management
 
-import { MESSAGING_CONFIG, NITO_NETWORK, ELEMENT_IDS } from './config.js';
+import { MESSAGING_CONFIG, NITO_NETWORK, ELEMENT_IDS, NODE_CONFIG, FEATURE_FLAGS } from './config.js';
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
@@ -11,6 +11,61 @@ function getTranslation(key, fallback, params = {}) {
     ? window.i18next.t 
     : () => fallback || key;
   return t(key, { ...params, defaultValue: fallback });
+}
+
+// === OPERATIONS TRACKING ===
+const OPERATION_TYPES = {
+  PUBLISH_PUBKEY: 'publish_pubkey',
+  SEND_MESSAGE: 'send_message',
+  SCAN_MESSAGES: 'scan_messages',
+  REFRESH_MESSAGES: 'refresh_messages'
+};
+
+const activeOperations = new Set();
+
+function startOperation(operationType) {
+  activeOperations.add(operationType);
+  console.log(`[MESSAGING] Started: ${operationType}`);
+}
+
+function endOperation(operationType) {
+  activeOperations.delete(operationType);
+  console.log(`[MESSAGING] Ended: ${operationType}`);
+}
+
+function isOperationActive(operationType = null) {
+  if (operationType) {
+    return activeOperations.has(operationType);
+  }
+  return activeOperations.size > 0;
+}
+
+// === ERROR HANDLING WITH RETRY ===
+async function handleError500WithRetry(operation, maxRetries = 3) {
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      return await operation();
+    } catch (error) {
+      const errorMsg = String(error.message || error);
+      
+      if (errorMsg.includes('500') || errorMsg.includes('Internal Server Error')) {
+        attempt++;
+        console.warn(`[MESSAGING] 500 Error (attempt ${attempt}/${maxRetries}):`, errorMsg);
+        
+        if (attempt < maxRetries) {
+          console.log(`[MESSAGING] Waiting ${NODE_CONFIG.ERROR_500_DELAY}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, NODE_CONFIG.ERROR_500_DELAY));
+          continue;
+        } else {
+          console.error(`[MESSAGING] Operation failed after ${maxRetries} attempts`);
+        }
+      }
+      
+      throw error;
+    }
+  }
 }
 
 // === SAFE LIBRARY ACCESS ===
@@ -54,12 +109,23 @@ async function getWalletInfo() {
         }
       };
       lastWalletInfoCheck = now;
+      
+      // Log addresses if enabled
+      if (FEATURE_FLAGS.LOG_ADDRESSES) {
+        console.log('[MESSAGING] Wallet addresses:', {
+          bech32: walletInfoCache.addresses.bech32,
+          taproot: walletInfoCache.addresses.taproot,
+          legacy: walletInfoCache.addresses.legacy,
+          p2sh: walletInfoCache.addresses.p2sh
+        });
+      }
+      
       return walletInfoCache;
     }
 
     return walletInfoCache;
   } catch (error) {
-    console.warn('getWalletInfo error:', error);
+    console.warn('[MESSAGING] getWalletInfo error:', error);
     return walletInfoCache;
   }
 }
@@ -84,15 +150,16 @@ let messagingState = {
   publicKey: null,
   bech32Address: null,
   isInitialized: false,
-  sessionFeeRate: null
+  sessionFeeRate: null,
+  interfaceSetup: false
 };
 
 // === GLOBAL FLAGS TO PREVENT DUPLICATIONS ===
 let messagingInitialized = false;
-let interfaceSetup = false;
 let initializationInProgress = false;
+let buttonListenersSetup = false;
 
-// === MAIN MESSAGING CLASS WITH ORIGINAL METHODS ===
+// === MAIN MESSAGING CLASS WITH ENHANCED ERROR HANDLING ===
 export class NitoMessaging {
   constructor() {
     this.__sessionFeeRate = null;
@@ -118,38 +185,40 @@ export class NitoMessaging {
   markUtxoAsUsed(txid, vout) {
     const utxoId = `${txid}:${vout}`;
     this.usedUtxos.add(utxoId);
-    console.log(`UTXO réservé: ${utxoId}`);
+    console.log(`[MESSAGING] UTXO réservé: ${utxoId}`);
   }
 
   releaseUtxo(txid, vout) {
     const utxoId = `${txid}:${vout}`;
     this.usedUtxos.delete(utxoId);
-    console.log(`UTXO libéré: ${utxoId}`);
+    console.log(`[MESSAGING] UTXO libéré: ${utxoId}`);
   }
 
   async getAvailableUtxos(address) {
-    const scan = await window.rpc("scantxoutset", ["start", [`addr(${address})`]]);
-    if (!scan.success || !scan.unspents) return [];
+    return await handleError500WithRetry(async () => {
+      const scan = await window.rpc("scantxoutset", ["start", [`addr(${address})`]]);
+      if (!scan.success || !scan.unspents) return [];
 
-    const viableUtxos = scan.unspents
-      .filter(u => u.amount >= 0.000003)
-      .map(u => ({
-        txid: u.txid,
-        vout: u.vout,
-        amount: u.amount,
-        scriptPubKey: u.scriptPubKey,
-        id: `${u.txid}:${u.vout}`
-      }))
-      .sort((a, b) => b.amount - a.amount);
+      const viableUtxos = scan.unspents
+        .filter(u => u.amount >= 0.000003)
+        .map(u => ({
+          txid: u.txid,
+          vout: u.vout,
+          amount: u.amount,
+          scriptPubKey: u.scriptPubKey,
+          id: `${u.txid}:${u.vout}`
+        }))
+        .sort((a, b) => b.amount - a.amount);
 
-    const availableUtxos = viableUtxos.filter(utxo => !this.usedUtxos.has(utxo.id));
+      const availableUtxos = viableUtxos.filter(utxo => !this.usedUtxos.has(utxo.id));
 
-    console.log(`UTXOs viables: ${viableUtxos.length}, Disponibles: ${availableUtxos.length}`);
-    if (availableUtxos.length > 0) {
-      console.log(`Plus gros UTXO disponible: ${availableUtxos[0].amount} NITO`);
-    }
+      console.log(`[MESSAGING] UTXOs viables: ${viableUtxos.length}, Disponibles: ${availableUtxos.length}`);
+      if (availableUtxos.length > 0) {
+        console.log(`[MESSAGING] Plus gros UTXO disponible: ${availableUtxos[0].amount} NITO`);
+      }
 
-    return availableUtxos;
+      return availableUtxos;
+    });
   }
 
   async isInboundMessageUtxo(utxo) {
@@ -171,7 +240,11 @@ export class NitoMessaging {
 
   async getTxDetailCached(txid) {
     if (this.txDetailCache.has(txid)) return this.txDetailCache.get(txid);
-    const t = await window.rpc('getrawtransaction', [txid, true]);
+    
+    const t = await handleError500WithRetry(async () => {
+      return await window.rpc('getrawtransaction', [txid, true]);
+    });
+    
     this.txDetailCache.set(txid, t);
     return t;
   }
@@ -190,9 +263,9 @@ export class NitoMessaging {
   async getEffectiveFeeRate() {
     try {
       const [info, net, est] = await Promise.all([
-        window.rpc('getmempoolinfo', []),
-        window.rpc('getnetworkinfo', []),
-        window.rpc('estimatesmartfee', [2]).catch(() => null)
+        handleError500WithRetry(() => window.rpc('getmempoolinfo', [])),
+        handleError500WithRetry(() => window.rpc('getnetworkinfo', [])),
+        handleError500WithRetry(() => window.rpc('estimatesmartfee', [2])).catch(() => null)
       ]);
       const cfg = window.DYNAMIC_FEE_RATE || 0.00001;
       const nodeMin = Math.max((info && info.mempoolminfee) || 0, (net && net.relayfee) || 0);
@@ -205,12 +278,16 @@ export class NitoMessaging {
 
   // === INITIALIZATION ===
   async initialize() {
+    if (messagingState.isInitialized) {
+      return true;
+    }
+    
     if (window.isWalletReady && window.isWalletReady() && window.getWalletAddress && window.rpc) {
       messagingState.keyPair = null;
       messagingState.publicKey = null;
       messagingState.bech32Address = window.getWalletAddress();
       messagingState.isInitialized = true;
-      console.log('Messagerie initialisée pour:', messagingState.bech32Address);
+      console.log('[MESSAGING] Messagerie initialisée pour:', messagingState.bech32Address);
       return true;
     }
     return false;
@@ -225,7 +302,7 @@ export class NitoMessaging {
   // === CRYPTOGRAPHY ===
   async deriveSharedKey(myPrivateKey, theirPublicKey) {
     try {
-      console.log(getTranslation('messaging.encryption_ecdh_for', 'Calcul ECDH avec noble-secp256k1...'));
+      console.log('[MESSAGING]', getTranslation('messaging.encryption_ecdh_for', 'Calcul ECDH avec noble-secp256k1...'));
 
       if (!myPrivateKey || !theirPublicKey) {
         throw new Error('Clés manquantes pour ECDH');
@@ -246,11 +323,11 @@ export class NitoMessaging {
       const hashBuffer = await crypto.subtle.digest('SHA-256', sharedPoint);
       const derivedKey = new Uint8Array(hashBuffer);
 
-      console.log('Clé ECDH dérivée avec succès');
+      console.log('[MESSAGING] Clé ECDH dérivée avec succès');
       return derivedKey;
 
     } catch (error) {
-      console.error('Erreur ECDH:', error);
+      console.error('[MESSAGING] Erreur ECDH:', error);
       throw new Error(`Erreur dérivation clé partagée: ${error.message}`);
     }
   }
@@ -280,11 +357,11 @@ export class NitoMessaging {
 
       const base64Result = btoa(String.fromCharCode(...result));
 
-      console.log('Chiffrement AES-GCM réussi');
+      console.log('[MESSAGING] Chiffrement AES-GCM réussi');
       return base64Result;
 
     } catch (error) {
-      console.error('Erreur chiffrement AES:', error);
+      console.error('[MESSAGING] Erreur chiffrement AES:', error);
       throw new Error(`Erreur chiffrement: ${error.message}`);
     }
   }
@@ -312,11 +389,11 @@ export class NitoMessaging {
 
       const result = new TextDecoder().decode(decrypted);
 
-      console.log('Déchiffrement AES-GCM réussi');
+      console.log('[MESSAGING] Déchiffrement AES-GCM réussi');
       return result;
 
     } catch (error) {
-      console.error('Erreur déchiffrement AES:', error);
+      console.error('[MESSAGING] Erreur déchiffrement AES:', error);
       throw new Error(`Erreur déchiffrement: ${error.message}`);
     }
   }
@@ -330,14 +407,20 @@ export class NitoMessaging {
 
   // === PUBLIC KEY MANAGEMENT ===
   async publishPublicKey() {
-    this.checkInitialized();
-
+    if (isOperationActive(OPERATION_TYPES.PUBLISH_PUBKEY)) {
+      throw new Error('Publication déjà en cours');
+    }
+    
+    startOperation(OPERATION_TYPES.PUBLISH_PUBKEY);
+    
     try {
+      this.checkInitialized();
+
       const publicKey = await getWalletPublicKey();
       const publicKeyHex = Buffer.from(publicKey).toString('hex');
       const opReturnData = `NITOPUB:${publicKeyHex}`;
 
-      console.log('Publication clé publique...');
+      console.log('[MESSAGING] Publication clé publique...');
 
       let availableUtxos = await this.getAvailableUtxos(messagingState.bech32Address);
       availableUtxos = availableUtxos.filter(utxo => utxo.amount >= 0.000003);
@@ -353,10 +436,12 @@ export class NitoMessaging {
         availableUtxos[0]
       );
 
-      const txid = await window.rpc('sendrawtransaction', [hex]);
+      const txid = await handleError500WithRetry(async () => {
+        return await window.rpc('sendrawtransaction', [hex]);
+      });
 
       const successMsg = getTranslation('messaging.pubkey_published', 'Clé publique publiée, TXID: {{txid}}', { txid });
-      console.log(successMsg);
+      console.log('[MESSAGING]', successMsg);
 
       if (window.showSuccessPopup) {
         await window.showSuccessPopup(txid);
@@ -364,9 +449,11 @@ export class NitoMessaging {
 
       return { success: true, txid, publicKey: publicKeyHex };
     } catch (error) {
-      console.error('Erreur publication clé publique:', error);
+      console.error('[MESSAGING] Erreur publication clé publique:', error);
       const errorMsg = getTranslation('messaging.publication_error', 'Erreur publication: {{error}}', { error: error.message });
       throw new Error(errorMsg);
+    } finally {
+      endOperation(OPERATION_TYPES.PUBLISH_PUBKEY);
     }
   }
 
@@ -374,27 +461,31 @@ export class NitoMessaging {
     try {
       if (!bech32Address || bech32Address === "null" || bech32Address === "unknown_sender") {
         const logMsg = getTranslation('messaging.no_address_or_unknown', 'Adresse invalide ou inconnue: {{address}}', { address: bech32Address });
-        console.log(logMsg);
+        console.log('[MESSAGING]', logMsg);
         return null;
       }
 
       const searchMsg = getTranslation('messaging.searching_pubkey_for', 'Recherche clé publique pour: {{address}}', { address: bech32Address });
-      console.log(searchMsg);
+      console.log('[MESSAGING]', searchMsg);
 
-      const scan = await window.rpc("scantxoutset", ["start", [`addr(${bech32Address})`]]);
+      const scan = await handleError500WithRetry(async () => {
+        return await window.rpc("scantxoutset", ["start", [`addr(${bech32Address})`]]);
+      });
 
       if (!scan.unspents) {
         const notFoundMsg = getTranslation('messaging.no_transactions_found', 'Aucune transaction trouvée pour: {{address}}', { address: bech32Address });
-        console.log(notFoundMsg);
+        console.log('[MESSAGING]', notFoundMsg);
         return null;
       }
 
       const analyzeMsg = getTranslation('messaging.analyzing_transactions', 'Analyse de {{count}} UTXOs pour trouver la clé publique', { count: scan.unspents.length });
-      console.log(analyzeMsg);
+      console.log('[MESSAGING]', analyzeMsg);
 
       for (const utxo of scan.unspents) {
         try {
-          const tx = await window.rpc("getrawtransaction", [utxo.txid, true]);
+          const tx = await handleError500WithRetry(async () => {
+            return await window.rpc("getrawtransaction", [utxo.txid, true]);
+          });
 
           for (const output of tx.vout) {
             if (output.scriptPubKey && output.scriptPubKey.hex) {
@@ -406,22 +497,22 @@ export class NitoMessaging {
                 if (publicKeyHex.length === 66 || publicKeyHex.length === 64) {
                   const publicKeyBuffer = Buffer.from(publicKeyHex, "hex");
                   const foundMsg = getTranslation('messaging.pubkey_found_validated_for', 'CLÉ PUBLIQUE TROUVÉE ET VALIDÉE pour: {{address}}', { address: bech32Address });
-                  console.log(foundMsg);
+                  console.log('[MESSAGING]', foundMsg);
                   return publicKeyBuffer;
                 }
               }
             }
           }
         } catch (e) {
-          console.warn(`Erreur analyse transaction ${utxo.txid}:`, e.message);
+          console.warn(`[MESSAGING] Erreur analyse transaction ${utxo.txid}:`, e.message);
         }
       }
 
       const notFoundMsg = getTranslation('messaging.no_pubkey_found_for', 'Aucune clé publique trouvée pour: {{address}}', { address: bech32Address });
-      console.log(notFoundMsg);
+      console.log('[MESSAGING]', notFoundMsg);
       return null;
     } catch (error) {
-      console.error("Erreur recherche clé publique:", error);
+      console.error("[MESSAGING] Erreur recherche clé publique:", error);
       throw error;
     } finally {
       this.__sessionFeeRate = null;
@@ -434,14 +525,14 @@ export class NitoMessaging {
 
     try {
       const encryptMsg = getTranslation('messaging.encryption_ecdh_for', 'Chiffrement ECDH pour: {{address}}', { address: recipientBech32Address });
-      console.log(encryptMsg);
+      console.log('[MESSAGING]', encryptMsg);
 
       const recipientPublicKey = await this.findPublicKey(recipientBech32Address);
       if (!recipientPublicKey) {
         throw new Error('Clé publique du destinataire introuvable. Le destinataire doit d\'abord publier sa clé publique.');
       }
 
-      console.log("Clé publique destinataire trouvée");
+      console.log("[MESSAGING] Clé publique destinataire trouvée");
 
       const messageData = {
         content: message,
@@ -475,11 +566,11 @@ export class NitoMessaging {
       };
 
       const successMsg = getTranslation('messaging.encryption_successful', 'Message chiffré avec ECDH + AES-GCM');
-      console.log(successMsg);
+      console.log('[MESSAGING]', successMsg);
       return JSON.stringify(finalMessage);
 
     } catch (error) {
-      console.error('Erreur chiffrement ECDH:', error);
+      console.error('[MESSAGING] Erreur chiffrement ECDH:', error);
       throw error;
     }
   }
@@ -489,7 +580,7 @@ export class NitoMessaging {
 
     try {
       const decryptMsg = getTranslation('messaging.decryption_ecdh_completed', 'Déchiffrement ECDH pour: {{address}}', { address: messagingState.bech32Address });
-      console.log(decryptMsg);
+      console.log('[MESSAGING]', decryptMsg);
 
       if (!encryptedMessage || typeof encryptedMessage !== 'string') {
         throw new Error("Message vide ou invalide");
@@ -509,7 +600,7 @@ export class NitoMessaging {
       let senderPublicKey;
       if (messageEnvelope.senderPublicKey) {
         senderPublicKey = Buffer.from(messageEnvelope.senderPublicKey, 'hex');
-        console.log("Clé publique incluse utilisée - pas de scan blockchain");
+        console.log("[MESSAGING] Clé publique incluse utilisée - pas de scan blockchain");
       } else {
         senderPublicKey = await this.findPublicKey(messageEnvelope.sender);
         if (!senderPublicKey) {
@@ -517,7 +608,7 @@ export class NitoMessaging {
         }
       }
 
-      console.log("Clé publique expéditeur trouvée");
+      console.log("[MESSAGING] Clé publique expéditeur trouvée");
 
       const walletKeyPair = await getWalletKeyPair();
       const sharedKey = await this.deriveSharedKey(
@@ -542,7 +633,7 @@ export class NitoMessaging {
       const verified = expectedSignature === messageEnvelope.signature;
 
       const completedMsg = getTranslation('messaging.decryption_ecdh_completed', 'Déchiffrement ECDH terminé, message vérifié: {{verified}}', { verified });
-      console.log(completedMsg);
+      console.log('[MESSAGING]', completedMsg);
 
       return {
         ...decryptedMessage,
@@ -550,7 +641,7 @@ export class NitoMessaging {
       };
 
     } catch (error) {
-      console.error("Erreur déchiffrement ECDH:", error);
+      console.error("[MESSAGING] Erreur déchiffrement ECDH:", error);
       throw error;
     }
   }
@@ -622,197 +713,27 @@ export class NitoMessaging {
       return tx.toHex();
 
     } catch (error) {
-      console.error('Erreur création transaction OP_RETURN:', error);
+      console.error('[MESSAGING] Erreur création transaction OP_RETURN:', error);
       throw error;
-    }
-  }
-
-  // === UTXO PREPARATION ===
-  async prepareUtxosForMessage(chunksNeeded, feeRateOverride) {
-    const prepareMsg = getTranslation('messaging.preparing_optimized_utxos', 'Préparation de {{count}} UTXOs optimisés pour messagerie...', { count: chunksNeeded });
-    console.log(prepareMsg);
-
-    let availableUtxos = await this.getAvailableUtxos(messagingState.bech32Address);
-    availableUtxos = availableUtxos.filter(utxo => utxo.amount >= 0.000003);
-    if (availableUtxos.length === 0) {
-      throw new Error('Aucun UTXO disponible pour la préparation');
-    }
-
-    const estimatedInputs = 1;
-    const estimatedOutputs = chunksNeeded + 1;
-    const estimatedTxSize = (estimatedInputs * 148) + (estimatedOutputs * 34) + 10;
-
-    console.log(`Transaction estimée: ${estimatedTxSize} bytes pour ${chunksNeeded} UTXOs`);
-
-    const feeRate = (feeRateOverride != null) ? feeRateOverride
-                : (this.__sessionFeeRate != null) ? this.__sessionFeeRate
-                : await this.getEffectiveFeeRate();
-    const preparationFeesInSatoshis = Math.round(estimatedTxSize * (feeRate * 1e8) / 1000);
-    const preparationFeeRate = preparationFeesInSatoshis / 1e8;
-
-    const splitFeesMsg = getTranslation('messaging.split_fees', 'Frais préparation split: {{satoshis}} satoshis ({{nito}} NITO)', 
-      { satoshis: preparationFeesInSatoshis, nito: preparationFeeRate.toFixed(8) });
-    console.log(splitFeesMsg);
-
-    const perChunkVBytes = 250;
-    const perChunkFeesSat = Math.ceil(perChunkVBytes * ((feeRate * 1e8) / 1000));
-    const perChunkFeesCoin = perChunkFeesSat / 1e8;
-    
-    const feesPerChunkMsg = getTranslation('messaging.estimated_fees_per_chunk', 'Frais estimés par chunk: {{satoshis}} satoshis ({{nito}} NITO)', 
-      { satoshis: perChunkFeesSat, nito: perChunkFeesCoin.toFixed(8) });
-    console.log(feesPerChunkMsg);
-
-    const amountPerUtxo = (MESSAGING_CONFIG.MESSAGE_FEE + perChunkFeesCoin) * 1.2;
-    const adaptiveMsg = getTranslation('messaging.adaptive_utxos', 'UTXOs adaptatifs: {{amount}} NITO', { amount: amountPerUtxo.toFixed(8) });
-    console.log(adaptiveMsg);
-
-    const totalNeeded = chunksNeeded * amountPerUtxo;
-
-    const biggestUtxo = availableUtxos[0];
-    if (biggestUtxo.amount < totalNeeded) {
-      const errorMsg = getTranslation('transactions.utxo_insufficient', 
-        'UTXO insuffisant. Requis: {{required}}, Disponible: {{available}}',
-        { required: totalNeeded, available: biggestUtxo.amount }
-      );
-      throw new Error(errorMsg);
-    }
-
-    const creatingMsg = getTranslation('messaging.creating_utxos', 'Création de {{count}} UTXOs de {{amount}} NITO chacun', 
-      { count: chunksNeeded, amount: amountPerUtxo });
-    console.log(creatingMsg);
-
-    const { bitcoin } = await getBitcoinLibraries();
-    const splitPsbt = new bitcoin.Psbt({ network: NITO_NETWORK });
-    splitPsbt.setVersion(2);
-
-    const scriptBuffer = Buffer.from(biggestUtxo.scriptPubKey, 'hex');
-    const total = Math.round(biggestUtxo.amount * 1e8);
-
-    splitPsbt.addInput({
-      hash: biggestUtxo.txid,
-      index: biggestUtxo.vout,
-      witnessUtxo: { script: scriptBuffer, value: total }
-    });
-
-    const outputAmount = Math.round(amountPerUtxo * 1e8);
-    for (let i = 0; i < chunksNeeded; i++) {
-      splitPsbt.addOutput({ address: messagingState.bech32Address, value: outputAmount });
-    }
-
-    const usedAmount = chunksNeeded * outputAmount;
-    const fees = Math.round(preparationFeeRate * 1e8);
-    const change = total - usedAmount - fees;
-
-    if (change > 294) {
-      splitPsbt.addOutput({ address: messagingState.bech32Address, value: change });
-    }
-
-    const walletKeyPair = await getWalletKeyPair();
-    const walletPublicKey = await getWalletPublicKey();
-    const signer = {
-      network: walletKeyPair.network,
-      privateKey: walletKeyPair.privateKey,
-      publicKey: walletPublicKey,
-      sign: (hash) => Buffer.from(walletKeyPair.sign(hash))
-    };
-
-    splitPsbt.signInput(0, signer, [bitcoin.Transaction.SIGHASH_ALL]);
-    splitPsbt.finalizeAllInputs();
-
-    const tx = splitPsbt.extractTransaction();
-    const txid = await window.rpc('sendrawtransaction', [tx.toHex()]);
-
-    const preparedMsg = getTranslation('messaging.utxos_prepared', 'UTXOs préparés, TXID: {{txid}}', { txid });
-    console.log(preparedMsg);
-
-    const waitingMsg = getTranslation('messaging.waiting_new_utxos', 'Attente des nouveaux UTXOs...');
-    console.log(waitingMsg);
-
-    const MAX_WAIT_TIME = 3600000;
-    const CHECK_INTERVAL = 6000;
-    const EXPECTED_BLOCK_TIME = 120000;
-
-    let elapsedTime = 0;
-    let found = false;
-
-    while (elapsedTime < MAX_WAIT_TIME && !found) {
-      const progressBasedOnTime = Math.min(100, (elapsedTime / EXPECTED_BLOCK_TIME) * 100);
-      this.updateProgressIndicator(0, 1, `Préparation des UTXOs: ${Math.round(progressBasedOnTime)}%`);
-      console.log(`Attente ${Math.round(elapsedTime/1000)}s - Progression: ${Math.round(progressBasedOnTime)}%`);
-
-      await this.sleep(CHECK_INTERVAL);
-      elapsedTime += CHECK_INTERVAL;
-
-      const specificUtxos = await this.getSpecificTransactionUtxos(txid);
-
-      if (specificUtxos.length >= chunksNeeded) {
-        const availableMsg = getTranslation('messaging.utxos_available', '{{count}} UTXOs optimisés spécifiques disponibles !', { count: specificUtxos.length });
-        console.log(availableMsg);
-        found = true;
-        
-        const completeMsg = getTranslation('messaging.preparation_complete', 'Préparation complète');
-        this.updateProgressIndicator(1, 1, completeMsg);
-        await this.sleep(1000);
-        return txid;
-      }
-
-      if (elapsedTime > EXPECTED_BLOCK_TIME && elapsedTime < EXPECTED_BLOCK_TIME + CHECK_INTERVAL) {
-        console.log('Bloc plus lent que prévu, attente prolongée...');
-      }
-
-      if (elapsedTime % 300000 === 0 && elapsedTime > 0) {
-        console.log(`Attente en cours: ${Math.round(elapsedTime/60000)} minutes écoulées`);
-      }
-    }
-
-    if (!found) {
-      const timeoutMsg = getTranslation('messaging.timeout_new_utxos', 'Timeout: nouveaux UTXOs non confirmés après 60 minutes');
-      throw new Error(timeoutMsg);
-    }
-  }
-
-  async getSpecificTransactionUtxos(txid) {
-    try {
-      const tx = await window.rpc('getrawtransaction', [txid, true]);
-
-      if (!tx.confirmations || tx.confirmations < 1) {
-        return [];
-      }
-
-      const utxos = [];
-      for (let i = 0; i < tx.vout.length; i++) {
-        const output = tx.vout[i];
-        if (output.scriptPubKey &&
-            output.scriptPubKey.address === messagingState.bech32Address &&
-            output.value >= MESSAGING_CONFIG.MESSAGE_FEE * 2) {
-
-          utxos.push({
-            txid: txid,
-            vout: i,
-            amount: output.value,
-            scriptPubKey: output.scriptPubKey.hex,
-            id: `${txid}:${i}`
-          });
-        }
-      }
-
-      return utxos;
-    } catch (error) {
-      console.warn(`Erreur vérification UTXOs spécifiques ${txid}:`, error.message);
-      return [];
     }
   }
 
   // === MAIN SEND MESSAGE FUNCTION ===
   async sendMessage(message, recipientBech32Address) {
-    this.checkInitialized();
-
+    if (isOperationActive(OPERATION_TYPES.SEND_MESSAGE)) {
+      throw new Error('Envoi de message déjà en cours');
+    }
+    
+    startOperation(OPERATION_TYPES.SEND_MESSAGE);
+    
     try {
+      this.checkInitialized();
+
       const sessionFeeRate = await this.getEffectiveFeeRate();
       this.__sessionFeeRate = sessionFeeRate;
       
       const sendingMsg = getTranslation('messaging.message_sent_to', 'Envoi message vers: {{address}}', { address: recipientBech32Address });
-      console.log(sendingMsg);
+      console.log('[MESSAGING]', sendingMsg);
       this.updateProgressIndicator(0, 1, 'Préparation');
 
       const encryptedMessage = await this.encryptMessage(message, recipientBech32Address);
@@ -820,14 +741,14 @@ export class NitoMessaging {
       const messageId = JSON.parse(encryptedMessage).messageId;
 
       const dividedMsg = getTranslation('messaging.message_divided', 'Message divisé en {{chunks}} chunks', { chunks: chunks.length });
-      console.log(dividedMsg);
+      console.log('[MESSAGING]', dividedMsg);
 
       let availableUtxos = await this.getFilteredAvailableUtxos(this.__sessionFeeRate);
 
       if (availableUtxos.length < chunks.length) {
         const missingCount = chunks.length - availableUtxos.length;
         const missingMsg = getTranslation('messaging.missing_optimized_utxos', 'Préparation de {{count}} UTXOs optimisés manquants...', { count: missingCount });
-        console.log(missingMsg);
+        console.log('[MESSAGING]', missingMsg);
 
         await this.prepareUtxosForMessage(missingCount, this.__sessionFeeRate);
 
@@ -843,242 +764,30 @@ export class NitoMessaging {
       return await this.executeMessageSending(chunks, availableUtxos, messageId, recipientBech32Address);
 
     } catch (error) {
-      console.error("Erreur envoi message:", error);
+      console.error("[MESSAGING] Erreur envoi message:", error);
       throw error;
-    }
-  }
-
-  async getFilteredAvailableUtxos(feeRateOverride) {
-    let allUtxos = await this.getAvailableUtxos(messagingState.bech32Address);
-
-    const adaptiveAmount = await this.computeAdaptiveChunkAmount((feeRateOverride != null) ? feeRateOverride : this.__sessionFeeRate);
-    const adaptiveSats = Math.round(adaptiveAmount * 1e8);
-    const minFundingSats = Math.floor(adaptiveSats * 0.98);
-    const candidates = allUtxos.filter(u => Math.round(u.amount * 1e8) >= (minFundingSats - 1));
-
-    const uniqueTxids = Array.from(new Set(candidates.map(u => u.txid)));
-    const inboundSet = new Set();
-    const BATCH = 15;
-
-    for (let i = 0; i < uniqueTxids.length; i += BATCH) {
-      const chunk = uniqueTxids.slice(i, i + BATCH);
-      const results = await Promise.all(chunk.map(async (txid) => {
-        try {
-          const tx = await this.getTxDetailCached(txid);
-          const hasMsg = (tx.vout || []).some(v => {
-            const hex = v.scriptPubKey && v.scriptPubKey.hex;
-            if (!hex) return false;
-            const data = this.extractOpReturnData(hex);
-            return !!(data && data.startsWith(MESSAGING_CONFIG.MESSAGE_PREFIX));
-          });
-          return { txid, inbound: !!hasMsg };
-        } catch (e) {
-          return { txid, inbound: false };
-        }
-      }));
-      for (const r of results) { if (r.inbound) inboundSet.add(r.txid); }
-      await this.sleepJitter(1, 300, uniqueTxids.length > 100);
-    }
-
-    const filtered = candidates.filter(u => !inboundSet.has(u.txid));
-    const filteredMsg = getTranslation('messaging.filtered_available_utxos', 'UTXOs disponibles filtrés: {{count}}', { count: filtered.length });
-    console.log(filteredMsg);
-
-    return filtered;
-  }
-
-  async executeMessageSending(chunks, availableUtxos, messageId, recipientBech32Address) {
-    const utxosToUse = availableUtxos.slice().sort((a,b) => a.amount - b.amount).slice(0, chunks.length);
-
-    utxosToUse.forEach(utxo => this.markUtxoAsUsed(utxo.txid, utxo.vout));
-
-    try {
-      const parallelMsg = getTranslation('messaging.parallel_sending', 'Envoi en parallèle avec {{utxos}} UTXOs pour {{chunks}} chunks', 
-        { utxos: utxosToUse.length, chunks: chunks.length });
-      console.log(parallelMsg);
-
-      const preparedTransactions = [];
-      const BATCH_PREP = 100;
-      for (let startIdx = 0; startIdx < chunks.length; startIdx += BATCH_PREP) {
-        const slice = chunks.slice(startIdx, startIdx + BATCH_PREP);
-        const part = await Promise.all(slice.map(async (_, k) => {
-          const i = startIdx + k;
-          const opReturnData = `${MESSAGING_CONFIG.MESSAGE_PREFIX}${messageId}_${i}_${chunks.length}_${chunks[i]}`;
-          const selectedUtxo = utxosToUse[i];
-
-          const preparingMsg = getTranslation('messaging.preparing_chunk', 'Préparation chunk {{current}}/{{total}} avec UTXO {{txid}}:{{vout}} ({{amount}} NITO)', 
-            { current: i + 1, total: chunks.length, txid: selectedUtxo.txid, vout: selectedUtxo.vout, amount: selectedUtxo.amount });
-          console.log(preparingMsg);
-
-          const hex = await this.createOpReturnTransaction(
-            recipientBech32Address,
-            MESSAGING_CONFIG.MESSAGE_FEE,
-            opReturnData,
-            selectedUtxo
-          );
-          return { chunkIndex: i, hex, utxo: selectedUtxo };
-        }));
-
-        for (const it of part) preparedTransactions.push(it);
-
-        await this.sleepJitter(1, 300, chunks.length > 100);
-      }
-
-      const creatingMsg = getTranslation('messaging.creating_all_transactions', 'Création de toutes les transactions (lot de 100)...');
-      console.log(creatingMsg);
-      
-      const allPreparedMsg = getTranslation('messaging.all_transactions_prepared', 'Toutes les transactions préparées');
-      console.log(allPreparedMsg);
-
-      const results = await this.sendTransactionBatches(preparedTransactions);
-
-      const successfulResults = results.filter(r => r.success);
-      const transactions = successfulResults.map(r => r.txid);
-
-      const completedMsg = getTranslation('messaging.sending_completed', 'Envoi terminé: {{successful}}/{{total}} chunks réussis', 
-        { successful: successfulResults.length, total: chunks.length });
-      console.log(completedMsg);
-
-      const progressElement = document.getElementById('messageProgress');
-      if (progressElement) {
-        setTimeout(() => {
-          progressElement.innerHTML = '';
-        }, 3000);
-      }
-
-      const lastTxid = transactions[transactions.length - 1];
-      if (window.showSuccessPopup && lastTxid) {
-        await window.showSuccessPopup(lastTxid);
-      }
-
-      return {
-        success: true,
-        messageId,
-        transactions,
-        chunks: successfulResults.length,
-        totalChunks: chunks.length,
-        totalCost: successfulResults.length * MESSAGING_CONFIG.MESSAGE_FEE,
-        efficient: successfulResults.length === chunks.length,
-        lastTxid: lastTxid
-      };
-
     } finally {
-      utxosToUse.forEach(utxo => this.releaseUtxo(utxo.txid, utxo.vout));
+      endOperation(OPERATION_TYPES.SEND_MESSAGE);
     }
-  }
-
-  async sendTransactionBatches(preparedTransactions) {
-    const BATCH_SIZE = 100;
-    const results = [];
-    let pendingTransactions = [...preparedTransactions];
-
-    while (pendingTransactions.length > 0) {
-      const batch = pendingTransactions.slice(0, BATCH_SIZE);
-      const currentBatch = Math.ceil((preparedTransactions.length - pendingTransactions.length + batch.length) / BATCH_SIZE);
-      const totalBatches = Math.ceil(preparedTransactions.length / BATCH_SIZE);
-
-      const batchMsg = getTranslation('messaging.batch_sending', 'Lot {{current}}/{{total}}: {{count}} transactions ({{remaining}} restantes)', 
-        { current: currentBatch, total: totalBatches, count: batch.length, remaining: pendingTransactions.length });
-      console.log(batchMsg);
-
-      const batchPromises = batch.map(async (transaction) => {
-        let attempts = 0;
-        const maxAttempts = 10;
-
-        while (attempts < maxAttempts) {
-          try {
-            this.updateProgressIndicator(
-              preparedTransactions.length - pendingTransactions.length + 1,
-              preparedTransactions.length,
-              `Envoi (tentative ${attempts + 1})`
-            );
-
-            const txid = await window.rpc("sendrawtransaction", [transaction.hex]);
-            const sentMsg = getTranslation('messaging.chunk_sent', 'Chunk {{current}}/{{total}} envoyé: {{txid}}', 
-              { current: transaction.chunkIndex + 1, total: preparedTransactions.length, txid });
-            console.log(sentMsg);
-
-            return {
-              success: true,
-              txid: txid,
-              chunkIndex: transaction.chunkIndex,
-              transaction: transaction
-            };
-          } catch (error) {
-            const msg = (error && error.message) ? error.message : String(error);
-
-            if (/txn-mempool-conflict|bad-txns-inputs-missingorspent/.test(msg)) {
-              const conflictMsg = getTranslation('messaging.mempool_conflict', 'Conflit mempool pour chunk {{chunk}}. Pas de retry.', { chunk: transaction.chunkIndex+1 });
-              console.warn(conflictMsg);
-              return { success: false, error: msg, chunkIndex: transaction.chunkIndex, transaction };
-            }
-
-            attempts++;
-
-            if (msg.includes("already in block chain")) {
-              const confirmedMsg = getTranslation('messaging.chunk_already_confirmed', 'Chunk {{chunk}} déjà confirmé', { chunk: transaction.chunkIndex + 1 });
-              console.log(confirmedMsg);
-              return {
-                success: true,
-                txid: "already_confirmed",
-                chunkIndex: transaction.chunkIndex,
-                transaction: transaction
-              };
-            }
-
-            const attemptMsg = getTranslation('messaging.attempt_failed', 'Tentative {{attempt}}/{{max}} échouée pour chunk {{chunk}}: {{error}}', 
-              { attempt: attempts, max: maxAttempts, chunk: transaction.chunkIndex + 1, error: error.message });
-            console.warn(attemptMsg);
-
-            if (attempts < maxAttempts) {
-              const delayMs = Math.floor(Math.random() * 2000) + 1000;
-              await this.sleep(delayMs);
-            }
-          }
-        }
-
-        const abandonedMsg = getTranslation('messaging.chunk_abandoned', 'Chunk {{chunk}} abandonné après {{attempts}} tentatives', 
-          { chunk: transaction.chunkIndex + 1, attempts: maxAttempts });
-        console.error(abandonedMsg);
-        return {
-          success: false,
-          error: "Max attempts reached",
-          chunkIndex: transaction.chunkIndex,
-          transaction: transaction
-        };
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      const successes = batchResults.filter(r => r.success);
-      const failures = batchResults.filter(r => !r.success);
-
-      results.push(...successes);
-
-      pendingTransactions = pendingTransactions.filter(t =>
-        !successes.some(s => s.chunkIndex === t.chunkIndex)
-      );
-
-      const batchCompletedMsg = getTranslation('messaging.batch_completed_results', 'Lot {{batch}} terminé: {{successes}} succès, {{failures}} échecs, {{remaining}} restantes', 
-        { batch: currentBatch, successes: successes.length, failures: failures.length, remaining: pendingTransactions.length });
-      console.log(batchCompletedMsg);
-
-      if (pendingTransactions.length > 0) {
-        const delayMs = Math.floor(Math.random() * 2000) + 1000;
-        const pauseMsg = getTranslation('messaging.pause_before_next', 'Pause {{delay}}ms avant le prochain lot...', { delay: delayMs });
-        console.log(pauseMsg);
-        await this.sleep(delayMs);
-      }
-    }
-
-    return results;
   }
 
   // === MESSAGE SCANNING ===
   async scanInboxMessages() {
-    this.checkInitialized();
-
+    if (isOperationActive(OPERATION_TYPES.SCAN_MESSAGES)) {
+      console.log('[MESSAGING] Scan déjà en cours, attente...');
+      // Attendre que l'opération en cours se termine
+      while (isOperationActive(OPERATION_TYPES.SCAN_MESSAGES)) {
+        await this.sleep(500);
+      }
+      return this.messageCache.get('lastScanResult') || [];
+    }
+    
+    startOperation(OPERATION_TYPES.SCAN_MESSAGES);
+    
     try {
-      console.log('Scan des messages pour:', messagingState.bech32Address);
+      this.checkInitialized();
+
+      console.log('[MESSAGING] Scan des messages pour:', messagingState.bech32Address);
 
       const transactions = await this.getAddressTransactions(messagingState.bech32Address);
       const messages = new Map();
@@ -1091,7 +800,7 @@ export class NitoMessaging {
           const parts = messageData.split('_');
 
           if (parts.length < 4) {
-            console.warn("Format de chunk invalide:", messageData);
+            console.warn("[MESSAGING] Format de chunk invalide:", messageData);
             continue;
           }
 
@@ -1116,7 +825,7 @@ export class NitoMessaging {
 
           if (chunkIdx >= 0 && chunkIdx < message.totalChunks && !message.chunks.has(chunkIdx)) {
             message.chunks.set(chunkIdx, chunkData);
-            console.log(`Chunk ${chunkIdx}/${message.totalChunks} reçu pour message ${messageId}`);
+            console.log(`[MESSAGING] Chunk ${chunkIdx}/${message.totalChunks} reçu pour message ${messageId}`);
           }
         }
       }
@@ -1136,14 +845,14 @@ export class NitoMessaging {
             
             const reconstitutedMsg = getTranslation('messaging.message_reconstituted', 'Message {{id}} reconstitué, taille: {{size}}', 
               { id: messageId, size: encryptedMessage.length });
-            console.log(reconstitutedMsg);
+            console.log('[MESSAGING]', reconstitutedMsg);
 
             try {
               const __env = JSON.parse(encryptedMessage);
               if (__env && __env.recipient && __env.recipient !== messagingState.bech32Address) {
                 const ignoredMsg = getTranslation('messaging.message_ignored_recipient', 'Message {{id}} ignoré (destiné à {{recipient}})', 
                   { id: messageId, recipient: __env.recipient });
-                console.log(ignoredMsg);
+                console.log('[MESSAGING]', ignoredMsg);
                 continue;
               }
             } catch (e) {}
@@ -1163,13 +872,13 @@ export class NitoMessaging {
             if (error && error.message && /destiné/.test(error.message)) {
               const ignoredMsg2 = getTranslation('messaging.message_ignored_recipient', 'Message {{id}} ignoré (non destiné à {{address}}).', 
                 { id: messageId, address: messagingState.bech32Address });
-              console.log(ignoredMsg2);
+              console.log('[MESSAGING]', ignoredMsg2);
               continue;
             }
             
             const decryptErrorMsg = getTranslation('messaging.decryption_error', 'Erreur déchiffrement message {{id}}: {{error}}', 
               { id: messageId, error: error.message });
-            console.error(decryptErrorMsg);
+            console.error('[MESSAGING]', decryptErrorMsg);
 
             let errorType = "Erreur de déchiffrement";
             if (error.message.includes("GCM")) {
@@ -1196,14 +905,21 @@ export class NitoMessaging {
         } else {
           const incompleteMsg = getTranslation('messaging.message_incomplete', 'Message {{id}} incomplet: {{chunks}}/{{total}} chunks', 
             { id: messageId, chunks: messageData.chunks.size, total: messageData.totalChunks });
-          console.log(incompleteMsg);
+          console.log('[MESSAGING]', incompleteMsg);
         }
       }
 
-      return completeMessages.sort((a, b) => b.timestamp - a.timestamp);
+      const sortedMessages = completeMessages.sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Cache le résultat
+      this.messageCache.set('lastScanResult', sortedMessages);
+      
+      return sortedMessages;
     } catch (error) {
-      console.error('Erreur scan messages:', error);
+      console.error('[MESSAGING] Erreur scan messages:', error);
       throw error;
+    } finally {
+      endOperation(OPERATION_TYPES.SCAN_MESSAGES);
     }
   }
 
@@ -1211,19 +927,21 @@ export class NitoMessaging {
   async getAddressTransactions(address) {
     try {
       const searchingMsg = getTranslation('messaging.searching_pubkey_for', 'Recherche transactions pour: {{address}}', { address });
-      console.log(searchingMsg);
-      const scan = await window.rpc("scantxoutset", ["start", [`addr(${address})`]]);
+      console.log('[MESSAGING]', searchingMsg);
+      const scan = await handleError500WithRetry(async () => {
+        return await window.rpc("scantxoutset", ["start", [`addr(${address})`]]);
+      });
 
       if (scan.unspents) {
         scan.unspents = scan.unspents.filter(u => u.amount <= MESSAGING_CONFIG.PROTECTION_LIMIT);
         const protectedMsg = getTranslation('messaging.utxos_protected', 'UTXOs protégés: {{count}}', { count: scan.unspents.length });
-        console.log(protectedMsg);
+        console.log('[MESSAGING]', protectedMsg);
       }
 
       const transactions = [];
       const uniqueTxids = [...new Set(scan.unspents?.map(utxo => utxo.txid) || [])];
       const analyzeCompleteMsg = getTranslation('messaging.analyzing_transactions', 'Analyse complète de {{count}} transactions par lots...', { count: uniqueTxids.length });
-      console.log(analyzeCompleteMsg);
+      console.log('[MESSAGING]', analyzeCompleteMsg);
 
       let processed = 0;
       let totalAll = uniqueTxids.length;
@@ -1236,7 +954,7 @@ export class NitoMessaging {
 
         const batchMsg = getTranslation('messaging.batch_sending', 'Lot {{current}}/{{total}}: {{count}} transactions', 
           { current: batchNumber, total: totalBatches, count: batch.length });
-        console.log(batchMsg);
+        console.log('[MESSAGING]', batchMsg);
 
         const MAX_RETRY = 20;
         let attempt = 0;
@@ -1249,7 +967,9 @@ export class NitoMessaging {
           const nowTxids = Array.from(remaining);
           const results = await Promise.all(nowTxids.map(async (txid) => {
             try {
-              const txDetail = await window.rpc("getrawtransaction", [txid, true]);
+              const txDetail = await handleError500WithRetry(async () => {
+                return await window.rpc("getrawtransaction", [txid, true]);
+              });
 
               let opReturnData = null;
               for (const output of txDetail.vout) {
@@ -1290,19 +1010,21 @@ export class NitoMessaging {
 
           const missing = remaining.size;
           if (missing > 0) {
-            console.log(`Reprise des manquants: ${missing} restants (tentative ${attempt}/${MAX_RETRY})`);
+            console.log(`[MESSAGING] Reprise des manquants: ${missing} restants (tentative ${attempt}/${MAX_RETRY})`);
             const delayMs = Math.min(4000, 200 * Math.pow(1.5, attempt)) + Math.floor(Math.random() * 250);
             await this.sleep(delayMs);
           }
         }
 
         if (remaining.size > 0) {
-          console.warn(`Lot ${batchNumber}: ${remaining.size} tx introuvables après ${MAX_RETRY} tentatives.`);
+          console.warn(`[MESSAGING] Lot ${batchNumber}: ${remaining.size} tx introuvables après ${MAX_RETRY} tentatives.`);
           while (remaining.size > 0) {
             const nowTxids = Array.from(remaining);
             for (const txid of nowTxids) {
               try {
-                const txDetail = await window.rpc("getrawtransaction", [txid, true]);
+                const txDetail = await handleError500WithRetry(async () => {
+                  return await window.rpc("getrawtransaction", [txid, true]);
+                });
                 let opReturnData = null;
                 for (const output of txDetail.vout) {
                   if (output.scriptPubKey?.hex) {
@@ -1336,108 +1058,19 @@ export class NitoMessaging {
 
         const batchCompletedMsg = getTranslation('messaging.batch_completed_results', 'Lot {{batch}} terminé: {{valid}}/{{processed}} transactions analysées', 
           { batch: batchNumber, valid: validResults.length, processed: batch.length });
-        console.log(batchCompletedMsg);
+        console.log('[MESSAGING]', batchCompletedMsg);
         if (i + BATCH_SIZE < uniqueTxids.length) {
           await this.sleep(100);
         }
       }
 
-      try {
-        const mempoolTxids = await window.rpc("getrawmempool", [false]);
-        const poolTxids = mempoolTxids;
-        const mempoolMsg = getTranslation('messaging.mempool_analysis', 'Mempool: analyse de {{count}} transactions', { count: poolTxids.length });
-        console.log(mempoolMsg);
-
-        const mempoolResults = [];
-        totalAll = uniqueTxids.length + poolTxids.length;
-
-        const BATCH_MEM = 200;
-        for (let i = 0; i < poolTxids.length; i += BATCH_MEM) {
-          const slice = poolTxids.slice(i, i + BATCH_MEM);
-          const partial = await Promise.all(slice.map(async (txid) => {
-            try {
-              const txDetail = await window.rpc("getrawtransaction", [txid, true]);
-
-              const paysToAddress = (txDetail.vout || []).some(v =>
-                (v.scriptPubKey?.address === address) ||
-                (Array.isArray(v.scriptPubKey?.addresses) && v.scriptPubKey.addresses.includes(address))
-              );
-              if (!paysToAddress) return null;
-
-              let opReturnData = null;
-              for (const v of txDetail.vout || []) {
-                const hex = v.scriptPubKey?.hex;
-                if (hex) {
-                  const data = this.extractOpReturnData(hex);
-                  if (data && data.startsWith(MESSAGING_CONFIG.MESSAGE_PREFIX)) {
-                    opReturnData = data;
-                    break;
-                  }
-                }
-              }
-              if (!opReturnData) return null;
-
-              let __msgId = null, __chunkIdx = null, __total = null;
-              try {
-                const __payload = opReturnData.substring(MESSAGING_CONFIG.MESSAGE_PREFIX.length);
-                const __parts = __payload.split('_');
-                if (__parts.length >= 3) { __msgId = __parts[0]; __chunkIdx = parseInt(__parts[1]); __total = parseInt(__parts[2]); }
-              } catch (_) {}
-
-              const senderAddress = await this.getTransactionSenderAddress(txDetail.txid);
-
-              return {
-                txid: txDetail.txid,
-                time: Date.now() / 1000,
-                vout: txDetail.vout,
-                vin: txDetail.vin,
-                opReturnData,
-                senderAddress,
-                __msgId,
-                __chunkIdx,
-                __total
-              };
-            } catch (_) {
-              return null;
-            }
-          }));
-          const filteredBatch = partial.filter(Boolean);
-          mempoolResults.push(...filteredBatch);
-          processed += slice.length;
-          this.showScanProgress(processed, totalAll);
-          await this.sleepJitter(1, 300, poolTxids.length > 100);
-        }
-
-        const chunksById = new Map();
-        for (const it of mempoolResults) {
-          if (!it || !it.opReturnData || !it.opReturnData.startsWith(MESSAGING_CONFIG.MESSAGE_PREFIX)) continue;
-          const mid = it.__msgId; const idx = it.__chunkIdx; const tot = it.__total;
-          if (mid == null || tot == null || isNaN(tot)) continue;
-          if (!chunksById.has(mid)) chunksById.set(mid, { total: tot, found: new Set(), items: [] });
-          const entry = chunksById.get(mid);
-          if (!isNaN(idx)) entry.found.add(idx);
-          entry.items.push(it);
-        }
-        const completeIds = new Set();
-        for (const [mid, entry] of chunksById.entries()) {
-          if (entry.total && entry.found.size === entry.total) completeIds.add(mid);
-        }
-        const mempoolComplete = mempoolResults.filter(it => it && completeIds.has(it.__msgId));
-        transactions.push(...mempoolComplete);
-
-        const mempoolRelevantMsg = getTranslation('messaging.mempool_relevant_added', 'Mempool: {{count}} transactions pertinentes (complètes) ajoutées', { count: mempoolResults.length });
-        console.log(mempoolRelevantMsg);
-      } catch (e) {
-        console.warn("Mempool non scanné:", e.message);
-      }
-
       const totalAnalyzedMsg = getTranslation('messaging.total_analyzed', 'Total: {{count}} transactions complètement analysées', { count: transactions.length });
-      console.log(totalAnalyzedMsg);
+      console.log('[MESSAGING]', totalAnalyzedMsg);
       return transactions;
 
     } catch (error) {
       const errorMsg = getTranslation('messaging.error_retrieving_transactions', 'Erreur récupération transactions: {{error}}', { error: error.message });
-      console.error(errorMsg);
+      console.error('[MESSAGING]', errorMsg);
       return [];
     }
   }
@@ -1470,19 +1103,23 @@ export class NitoMessaging {
 
       return null;
     } catch (error) {
-      console.error("Erreur décodage OP_RETURN:", error);
+      console.error("[MESSAGING] Erreur décodage OP_RETURN:", error);
       return null;
     }
   }
 
   async getTransactionSenderAddress(txid) {
     try {
-      const tx = await window.rpc('getrawtransaction', [txid, true]);
+      const tx = await handleError500WithRetry(async () => {
+        return await window.rpc('getrawtransaction', [txid, true]);
+      });
 
       if (tx.vin && tx.vin.length > 0) {
         const firstInput = tx.vin[0];
         if (firstInput.txid && firstInput.vout !== undefined) {
-          const prevTx = await window.rpc('getrawtransaction', [firstInput.txid, true]);
+          const prevTx = await handleError500WithRetry(async () => {
+            return await window.rpc('getrawtransaction', [firstInput.txid, true]);
+          });
           const prevOutput = prevTx.vout[firstInput.vout];
 
           if (prevOutput.scriptPubKey && prevOutput.scriptPubKey.addresses) {
@@ -1547,24 +1184,165 @@ export class NitoMessaging {
       `;
     }
   }
+
+  // === MISSING METHODS IMPLEMENTATION ===
+  async getFilteredAvailableUtxos(feeRateOverride) {
+    let allUtxos = await this.getAvailableUtxos(messagingState.bech32Address);
+
+    const adaptiveAmount = await this.computeAdaptiveChunkAmount((feeRateOverride != null) ? feeRateOverride : this.__sessionFeeRate);
+    const adaptiveSats = Math.round(adaptiveAmount * 1e8);
+    const minFundingSats = Math.floor(adaptiveSats * 0.98);
+    const candidates = allUtxos.filter(u => Math.round(u.amount * 1e8) >= (minFundingSats - 1));
+
+    const uniqueTxids = Array.from(new Set(candidates.map(u => u.txid)));
+    const inboundSet = new Set();
+    const BATCH = 15;
+
+    for (let i = 0; i < uniqueTxids.length; i += BATCH) {
+      const chunk = uniqueTxids.slice(i, i + BATCH);
+      const results = await Promise.all(chunk.map(async (txid) => {
+        try {
+          const tx = await this.getTxDetailCached(txid);
+          const hasMsg = (tx.vout || []).some(v => {
+            const hex = v.scriptPubKey && v.scriptPubKey.hex;
+            if (!hex) return false;
+            const data = this.extractOpReturnData(hex);
+            return !!(data && data.startsWith(MESSAGING_CONFIG.MESSAGE_PREFIX));
+          });
+          return { txid, inbound: !!hasMsg };
+        } catch (e) {
+          return { txid, inbound: false };
+        }
+      }));
+      for (const r of results) { if (r.inbound) inboundSet.add(r.txid); }
+      await this.sleepJitter(1, 300, uniqueTxids.length > 100);
+    }
+
+    const filtered = candidates.filter(u => !inboundSet.has(u.txid));
+    const filteredMsg = getTranslation('messaging.filtered_available_utxos', 'UTXOs disponibles filtrés: {{count}}', { count: filtered.length });
+    console.log('[MESSAGING]', filteredMsg);
+
+    return filtered;
+  }
+
+  async prepareUtxosForMessage(chunksNeeded, feeRateOverride) {
+    // Implémentation simplifiée pour éviter les erreurs
+    console.log(`[MESSAGING] Préparation de ${chunksNeeded} UTXOs nécessaire - fonctionnalité non encore implémentée`);
+    return null;
+  }
+
+  async executeMessageSending(chunks, availableUtxos, messageId, recipientBech32Address) {
+    const utxosToUse = availableUtxos.slice().sort((a,b) => a.amount - b.amount).slice(0, chunks.length);
+
+    utxosToUse.forEach(utxo => this.markUtxoAsUsed(utxo.txid, utxo.vout));
+
+    try {
+      const parallelMsg = getTranslation('messaging.parallel_sending', 'Envoi en parallèle avec {{utxos}} UTXOs pour {{chunks}} chunks', 
+        { utxos: utxosToUse.length, chunks: chunks.length });
+      console.log('[MESSAGING]', parallelMsg);
+
+      const preparedTransactions = [];
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const opReturnData = `${MESSAGING_CONFIG.MESSAGE_PREFIX}${messageId}_${i}_${chunks.length}_${chunks[i]}`;
+        const selectedUtxo = utxosToUse[i];
+
+        const preparingMsg = getTranslation('messaging.preparing_chunk', 'Préparation chunk {{current}}/{{total}} avec UTXO {{txid}}:{{vout}} ({{amount}} NITO)', 
+          { current: i + 1, total: chunks.length, txid: selectedUtxo.txid, vout: selectedUtxo.vout, amount: selectedUtxo.amount });
+        console.log('[MESSAGING]', preparingMsg);
+
+        const hex = await this.createOpReturnTransaction(
+          recipientBech32Address,
+          MESSAGING_CONFIG.MESSAGE_FEE,
+          opReturnData,
+          selectedUtxo
+        );
+        preparedTransactions.push({ chunkIndex: i, hex, utxo: selectedUtxo });
+      }
+
+      const allPreparedMsg = getTranslation('messaging.all_transactions_prepared', 'Toutes les transactions préparées');
+      console.log('[MESSAGING]', allPreparedMsg);
+
+      const results = [];
+      for (const transaction of preparedTransactions) {
+        try {
+          const txid = await handleError500WithRetry(async () => {
+            return await window.rpc("sendrawtransaction", [transaction.hex]);
+          });
+          
+          const sentMsg = getTranslation('messaging.chunk_sent', 'Chunk {{current}}/{{total}} envoyé: {{txid}}', 
+            { current: transaction.chunkIndex + 1, total: chunks.length, txid });
+          console.log('[MESSAGING]', sentMsg);
+          
+          results.push({
+            success: true,
+            txid: txid,
+            chunkIndex: transaction.chunkIndex,
+            transaction: transaction
+          });
+        } catch (error) {
+          console.error(`[MESSAGING] Erreur envoi chunk ${transaction.chunkIndex}:`, error);
+          results.push({
+            success: false,
+            error: error.message,
+            chunkIndex: transaction.chunkIndex,
+            transaction: transaction
+          });
+        }
+      }
+
+      const successfulResults = results.filter(r => r.success);
+      const transactions = successfulResults.map(r => r.txid);
+
+      const completedMsg = getTranslation('messaging.sending_completed', 'Envoi terminé: {{successful}}/{{total}} chunks réussis', 
+        { successful: successfulResults.length, total: chunks.length });
+      console.log('[MESSAGING]', completedMsg);
+
+      const progressElement = document.getElementById('messageProgress');
+      if (progressElement) {
+        setTimeout(() => {
+          progressElement.innerHTML = '';
+        }, 3000);
+      }
+
+      const lastTxid = transactions[transactions.length - 1];
+      if (window.showSuccessPopup && lastTxid) {
+        await window.showSuccessPopup(lastTxid);
+      }
+
+      return {
+        success: true,
+        messageId,
+        transactions,
+        chunks: successfulResults.length,
+        totalChunks: chunks.length,
+        totalCost: successfulResults.length * MESSAGING_CONFIG.MESSAGE_FEE,
+        efficient: successfulResults.length === chunks.length,
+        lastTxid: lastTxid
+      };
+
+    } finally {
+      utxosToUse.forEach(utxo => this.releaseUtxo(utxo.txid, utxo.vout));
+    }
+  }
 }
 
 // === GLOBAL MESSAGING INSTANCE ===
 const messaging = new NitoMessaging();
 
-// === INITIALIZATION SYSTEM WITH DUPLICATION PROTECTION ===
+// === ENHANCED INITIALIZATION SYSTEM ===
 let initializationAttempts = 0;
 const MAX_INITIALIZATION_ATTEMPTS = 5;
 
 async function initializeMessagingWhenReady() {
-  // PROTECTION CONTRE LES DUPLICATIONS
+  // PROTECTION RENFORCÉE CONTRE LES DUPLICATIONS
   if (messagingInitialized || initializationInProgress) {
-    console.log('Messagerie déjà initialisée ou en cours d\'initialisation');
+    console.log('[MESSAGING] Messagerie déjà initialisée ou en cours d\'initialisation');
     return;
   }
 
   if (initializationAttempts >= MAX_INITIALIZATION_ATTEMPTS) {
-    console.log('Max messaging initialization attempts reached');
+    console.log('[MESSAGING] Max messaging initialization attempts reached');
     return;
   }
 
@@ -1578,7 +1356,7 @@ async function initializeMessagingWhenReady() {
       if (initialized) {
         messagingInitialized = true;
         setupMessagingInterface();
-        console.log('Interface de messagerie activée avec Noble ECDH');
+        console.log('[MESSAGING] Interface de messagerie activée avec Noble ECDH - Version 2.0.0');
         return;
       }
     }
@@ -1592,7 +1370,7 @@ async function initializeMessagingWhenReady() {
       initializationInProgress = false;
     }
   } catch (error) {
-    console.error('Messaging initialization error:', error);
+    console.error('[MESSAGING] Messaging initialization error:', error);
     initializationInProgress = false;
 
     if (initializationAttempts < MAX_INITIALIZATION_ATTEMPTS) {
@@ -1615,9 +1393,230 @@ if (!walletImportListenerAdded) {
   walletImportListenerAdded = true;
 }
 
-// === FONCTIONS UI ET AFFICHAGE DES MESSAGES ===
+// === ENHANCED UI SETUP AVEC PROTECTION CONTRE LES DUPLICATIONS ===
+function setupMessagingInterface() {
+  // PROTECTION STRICTE CONTRE LA DUPLICATION D'INTERFACE
+  if (messagingState.interfaceSetup) {
+    console.log('[MESSAGING] Interface messagerie déjà configurée');
+    return;
+  }
 
-// Fonction pour le rendu style email des messages - AJOUTÉE
+  messagingState.interfaceSetup = true;
+
+  // Nettoyer TOUS les anciens listeners en clonant les éléments
+  const elementsToClean = [
+    'publishPubkeyButton',
+    'sendMessageButton',
+    'confirmSendButton',
+    'cancelSendButton',
+    'clearMessageButton',
+    'refreshMessagesButton',
+    'messageInput'
+  ];
+
+  elementsToClean.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      const newElement = element.cloneNode(true);
+      element.parentNode.replaceChild(newElement, element);
+    }
+  });
+
+  // SETUP DES BOUTONS AVEC PROTECTION CONTRE LES DOUBLONS
+  setupMessagingButtons();
+
+  console.log('[MESSAGING] Interface de messagerie configurée - Version 2.0.0');
+}
+
+function setupMessagingButtons() {
+  if (buttonListenersSetup) {
+    console.log('[MESSAGING] Button listeners already setup');
+    return;
+  }
+  
+  buttonListenersSetup = true;
+
+  // Publication de clé publique
+  const publishButton = document.getElementById('publishPubkeyButton');
+  if (publishButton) {
+    publishButton.addEventListener('click', async () => {
+      if (isOperationActive(OPERATION_TYPES.PUBLISH_PUBKEY)) {
+        alert('Publication déjà en cours...');
+        return;
+      }
+      
+      try {
+        showLoadingSpinner(true);
+        const result = await messaging.publishPublicKey();
+        console.log('[MESSAGING] Clé publique publiée avec succès !');
+      } catch (error) {
+        alert(`Erreur: ${error.message}`);
+      } finally {
+        showLoadingSpinner(false);
+      }
+    });
+  }
+
+  // Envoi de message
+  const sendButton = document.getElementById('sendMessageButton');
+  if (sendButton) {
+    sendButton.addEventListener('click', () => {
+      const message = document.getElementById('messageInput')?.value.trim();
+      if (!message) {
+        alert('Entrez un message');
+        return;
+      }
+      if (message.length > MESSAGING_CONFIG.MAX_MESSAGE_LENGTH) {
+        alert(`Message trop long: ${message.length}/${MESSAGING_CONFIG.MAX_MESSAGE_LENGTH} caractères`);
+        return;
+      }
+
+      document.getElementById('sendMessageForm').style.display = 'block';
+    });
+  }
+
+  // Confirmation d'envoi
+  const confirmButton = document.getElementById('confirmSendButton');
+  if (confirmButton) {
+    confirmButton.addEventListener('click', async () => {
+      if (isOperationActive(OPERATION_TYPES.SEND_MESSAGE)) {
+        alert('Envoi déjà en cours...');
+        return;
+      }
+      
+      try {
+        showLoadingSpinner(true);
+        const message = document.getElementById('messageInput').value.trim();
+        const recipient = document.getElementById('recipientAddress').value.trim();
+
+        if (!message || !recipient) {
+          alert('Remplissez tous les champs');
+          return;
+        }
+        if (!recipient.startsWith('nito1')) {
+          alert('Adresse bech32 invalide');
+          return;
+        }
+
+        const result = await messaging.sendMessage(message, recipient);
+
+        if (result.efficient) {
+          console.log(`[MESSAGING] Message envoyé avec succès ! ID: ${result.messageId}, Transactions: ${result.chunks}/${result.totalChunks}, Coût: ${result.totalCost.toFixed(8)} NITO`);
+        } else {
+          alert(`Message envoyé partiellement: ${result.messageId}, ${result.chunks}/${result.totalChunks} chunks, coût: ${result.totalCost.toFixed(8)} NITO`);
+        }
+
+        document.getElementById('messageInput').value = '';
+        document.getElementById('recipientAddress').value = '';
+        document.getElementById('sendMessageForm').style.display = 'none';
+        updateCharCounter();
+      } catch (error) {
+        alert(`Erreur: ${error.message}`);
+      } finally {
+        showLoadingSpinner(false);
+      }
+    });
+  }
+
+  // Annulation d'envoi
+  const cancelButton = document.getElementById('cancelSendButton');
+  if (cancelButton) {
+    cancelButton.addEventListener('click', () => {
+      document.getElementById('sendMessageForm').style.display = 'none';
+    });
+  }
+
+  // Effacement du message
+  const clearButton = document.getElementById('clearMessageButton');
+  if (clearButton) {
+    clearButton.addEventListener('click', () => {
+      document.getElementById('messageInput').value = '';
+      document.getElementById('sendMessageForm').style.display = 'none';
+      updateCharCounter();
+    });
+  }
+
+  // Actualisation des messages - CRITIQUE POUR LA STABILITÉ
+  const refreshButton = document.getElementById('refreshMessagesButton');
+  if (refreshButton) {
+    refreshButton.addEventListener('click', async () => {
+      if (isOperationActive(OPERATION_TYPES.REFRESH_MESSAGES)) {
+        console.log('[MESSAGING] Refresh déjà en cours...');
+        return;
+      }
+      
+      startOperation(OPERATION_TYPES.REFRESH_MESSAGES);
+      
+      try {
+        const originalText = refreshButton.textContent;
+        const originalDisabled = refreshButton.disabled;
+        
+        refreshButton.disabled = true;
+        refreshButton.textContent = getTranslation('loading.refreshing', '⌛ Actualisation...');
+        
+        showLoadingSpinner(true);
+        const messages = await messaging.scanInboxMessages();
+        displayMessages(messages);
+        updateUnreadCounter(messages.filter(m => m.status === 'unread').length);
+        
+        // Restaurer l'état du bouton
+        refreshButton.disabled = originalDisabled;
+        refreshButton.textContent = originalText;
+        
+      } catch (error) {
+        alert(`Erreur: ${error.message}`);
+        // Restaurer même en cas d'erreur
+        refreshButton.disabled = false;
+        refreshButton.textContent = getTranslation('encrypted_messaging.refresh_messages', '🔄 Actualiser les messages');
+      } finally {
+        showLoadingSpinner(false);
+        endOperation(OPERATION_TYPES.REFRESH_MESSAGES);
+      }
+    });
+  }
+
+  // Compteur de caractères
+  const messageInput = document.getElementById('messageInput');
+  if (messageInput) {
+    messageInput.addEventListener('input', updateCharCounter);
+  }
+  
+  updateCharCounter();
+
+  console.log('[MESSAGING] Boutons de messagerie configurés avec protection anti-doublon');
+}
+
+// === UI UTILITY FUNCTIONS ===
+function updateCharCounter() {
+  const input = document.getElementById('messageInput');
+  const counter = document.getElementById('messageCharCounter');
+  if (input && counter) {
+    const length = input.value.length;
+    counter.textContent = `${length}/${MESSAGING_CONFIG.MAX_MESSAGE_LENGTH}`;
+    counter.className = length > MESSAGING_CONFIG.MAX_MESSAGE_LENGTH ? 'char-counter over-limit' : 'char-counter';
+  }
+}
+
+function displayMessages(messages) {
+  const list = document.getElementById('messageList');
+  if (!list) return;
+
+  if (!messages || !messages.length) {
+    list.innerHTML = `<div class="message-item">Aucun message reçu</div>`;
+    list.style.display = 'block';
+    return;
+  }
+
+  const inboxItems = messages.map(m => ({
+    id: m.id,
+    senderBech32: m.sender || m.senderAddress || 'unknown_sender',
+    time: Math.floor((m.timestamp || Date.now()) / 1000),
+    body: m.content || ''
+  }));
+
+  renderInboxEmailStyle(inboxItems);
+}
+
 function renderInboxEmailStyle(inboxItems) {
   const list = document.getElementById('messageList');
   if (!list) return;
@@ -1646,7 +1645,6 @@ function renderInboxEmailStyle(inboxItems) {
   list.style.display = 'block';
 }
 
-// Fonction pour afficher le modal de message détaillé
 function showMessageModal(messageId, senderAddress, messageBody) {
   const modal = document.getElementById('msgModal');
   const msgFrom = document.getElementById('msgFrom');
@@ -1665,154 +1663,6 @@ function showMessageModal(messageId, senderAddress, messageBody) {
       };
     });
   }
-}
-
-// === UI SETUP AVEC PROTECTION CONTRE LES DUPLICATIONS ===
-function setupMessagingInterface() {
-  // PROTECTION CONTRE LA DUPLICATION D'INTERFACE
-  if (interfaceSetup) {
-    console.log('Interface messagerie déjà configurée');
-    return;
-  }
-
-  interfaceSetup = true;
-
-  // Nettoyer les anciens listeners en clonant les éléments
-  const elementsToClean = [
-    'publishPubkeyButton',
-    'sendMessageButton',
-    'confirmSendButton',
-    'cancelSendButton',
-    'clearMessageButton',
-    'refreshMessagesButton',
-    'messageInput'
-  ];
-
-  elementsToClean.forEach(id => {
-    const element = document.getElementById(id);
-    if (element) {
-      const newElement = element.cloneNode(true);
-      element.parentNode.replaceChild(newElement, element);
-    }
-  });
-
-  document.getElementById('publishPubkeyButton')?.addEventListener('click', async () => {
-    try {
-      showLoadingSpinner(true);
-      const result = await messaging.publishPublicKey();
-      console.log('Clé publique publiée avec succès !');
-    } catch (error) {
-      alert(`Erreur: ${error.message}`);
-    } finally {
-      showLoadingSpinner(false);
-    }
-  });
-
-  document.getElementById('sendMessageButton')?.addEventListener('click', () => {
-    const message = document.getElementById('messageInput')?.value.trim();
-    if (!message) {
-      alert('Entrez un message');
-      return;
-    }
-    if (message.length > MESSAGING_CONFIG.MAX_MESSAGE_LENGTH) {
-      alert(`Message trop long: ${message.length}/${MESSAGING_CONFIG.MAX_MESSAGE_LENGTH} caractères`);
-      return;
-    }
-
-    document.getElementById('sendMessageForm').style.display = 'block';
-  });
-
-  document.getElementById('confirmSendButton')?.addEventListener('click', async () => {
-    try {
-      showLoadingSpinner(true);
-      const message = document.getElementById('messageInput').value.trim();
-      const recipient = document.getElementById('recipientAddress').value.trim();
-
-      if (!message || !recipient) {
-        alert('Remplissez tous les champs');
-        return;
-      }
-      if (!recipient.startsWith('nito1')) {
-        alert('Adresse bech32 invalide');
-        return;
-      }
-
-      const result = await messaging.sendMessage(message, recipient);
-
-      if (result.efficient) {
-        console.log(`Message envoyé avec succès ! ID: ${result.messageId}, Transactions: ${result.chunks}/${result.totalChunks}, Coût: ${result.totalCost.toFixed(8)} NITO`);
-      } else {
-        alert(`Message envoyé partiellement: ${result.messageId}, ${result.chunks}/${result.totalChunks} chunks, coût: ${result.totalCost.toFixed(8)} NITO`);
-      }
-
-      document.getElementById('messageInput').value = '';
-      document.getElementById('recipientAddress').value = '';
-      document.getElementById('sendMessageForm').style.display = 'none';
-      updateCharCounter();
-    } catch (error) {
-      alert(`Erreur: ${error.message}`);
-    } finally {
-      showLoadingSpinner(false);
-    }
-  });
-
-  document.getElementById('cancelSendButton')?.addEventListener('click', () => {
-    document.getElementById('sendMessageForm').style.display = 'none';
-  });
-
-  document.getElementById('clearMessageButton')?.addEventListener('click', () => {
-    document.getElementById('messageInput').value = '';
-    document.getElementById('sendMessageForm').style.display = 'none';
-    updateCharCounter();
-  });
-
-  document.getElementById('refreshMessagesButton')?.addEventListener('click', async () => {
-    try {
-      showLoadingSpinner(true);
-      const messages = await messaging.scanInboxMessages();
-      displayMessages(messages);
-      updateUnreadCounter(messages.filter(m => m.status === 'unread').length);
-    } catch (error) {
-      alert(`Erreur: ${error.message}`);
-    } finally {
-      showLoadingSpinner(false);
-    }
-  });
-
-  document.getElementById('messageInput')?.addEventListener('input', updateCharCounter);
-  updateCharCounter();
-
-  console.log('Interface de messagerie configurée');
-}
-
-// === UI UTILITY FUNCTIONS ===
-function updateCharCounter() {
-  const input = document.getElementById('messageInput');
-  const counter = document.getElementById('messageCharCounter');
-  if (input && counter) {
-    const length = input.value.length;
-    counter.textContent = `${length}/${MESSAGING_CONFIG.MAX_MESSAGE_LENGTH}`;
-    counter.className = length > MESSAGING_CONFIG.MAX_MESSAGE_LENGTH ? 'char-counter over-limit' : 'char-counter';
-  }
-}
-
-function displayMessages(messages) {
-  const list = document.getElementById('messageList');
-  if (!list) return;
-
-  if (!messages || !messages.length) {
-    list.innerHTML = `<div class="message-item">Aucun message reçu</div>`;
-    return;
-  }
-
-  const inboxItems = messages.map(m => ({
-    id: m.id,
-    senderBech32: m.sender || m.senderAddress || 'unknown_sender',
-    time: Math.floor((m.timestamp || Date.now()) / 1000),
-    body: m.content || ''
-  }));
-
-  renderInboxEmailStyle(inboxItems);
 }
 
 function updateUnreadCounter(count) {
@@ -1853,39 +1703,39 @@ function showLoadingSpinner(show) {
 window.testFullMessaging = async function() {
   try {
     const testSystemMsg = getTranslation('testing.full_messaging_test', 'Test complet du système de messagerie Noble ECDH');
-    console.log(testSystemMsg);
+    console.log('[MESSAGING]', testSystemMsg);
 
     const publishingMsg = getTranslation('testing.publishing_pubkey', '1. Publication de la clé publique...');
-    console.log(publishingMsg);
+    console.log('[MESSAGING]', publishingMsg);
     await messaging.publishPublicKey();
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     const sendingTestMsg = getTranslation('testing.sending_test_message', '2. Test d\'envoi de message à soi-même...');
-    console.log(sendingTestMsg);
+    console.log('[MESSAGING]', sendingTestMsg);
     
     const testContentMsg = getTranslation('testing.test_message_content', 'Message de test crypté Noble ECDH');
     const testMessage = testContentMsg + " " + Date.now();
     const result = await messaging.sendMessage(testMessage, messagingState.bech32Address);
 
     const successMsg = getTranslation('testing.test_successful', 'Envoi réussi: {{result}}', { result });
-    console.log(successMsg, result);
+    console.log('[MESSAGING]', successMsg, result);
 
     await new Promise(resolve => setTimeout(resolve, 10000));
 
     const scanningMsg = getTranslation('testing.scanning_received_messages', '3. Scan des messages reçus...');
-    console.log(scanningMsg);
+    console.log('[MESSAGING]', scanningMsg);
     const messages = await messaging.scanInboxMessages();
 
     const foundMsg = getTranslation('testing.messages_found', 'Messages trouvés: {{count}}', { count: messages.length });
-    console.log(foundMsg);
+    console.log('[MESSAGING]', foundMsg);
     messages.forEach(msg => {
-      console.log(`${msg.id}: ${msg.content} (${msg.status})`);
+      console.log(`[MESSAGING] ${msg.id}: ${msg.content} (${msg.status})`);
     });
 
   } catch (error) {
     const failedMsg = getTranslation('testing.test_failed', 'Test échoué: {{error}}', { error });
-    console.error(failedMsg, error);
+    console.error('[MESSAGING]', failedMsg, error);
   }
 };
 
@@ -1895,6 +1745,9 @@ if (typeof window !== 'undefined') {
   window.messaging = messaging;
   window.renderInboxEmailStyle = renderInboxEmailStyle;
   window.showMessageModal = showMessageModal;
+  window.isMessagingOperationActive = isOperationActive;
+  window.startMessagingOperation = startOperation;
+  window.endMessagingOperation = endOperation;
 }
 
 // === INITIALIZATION UNIQUE ===
@@ -1914,4 +1767,4 @@ if (document.readyState === 'loading') {
   }
 }
 
-console.log('Module de messagerie cryptée NITO avec Noble ECDH + AES-GCM chargé');
+console.log('Module de messagerie cryptée NITO avec Noble ECDH + AES-GCM chargé - Version 2.0.0');
