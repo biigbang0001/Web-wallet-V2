@@ -1,5 +1,5 @@
 // Security Layer for NITO Wallet
-// Handles encryption, key management, validation, and security timers
+// Handles encryption, key management, validation
 
 import { SECURITY_CONFIG, VALIDATION_PATTERNS, ELEMENT_IDS, ERROR_CODES, FEATURE_FLAGS } from './config.js';
 import { eventBus, EVENTS } from './events.js';
@@ -56,7 +56,8 @@ class SecureKeyManager {
     this.inactivityTimer = null;
     this.displayTimer = null;
     this.operationCheckTimer = null;
-    this.lastClearReason = null; // Nouveau: track la raison du nettoyage
+    this.lastClearReason = null;
+    this.isInactivityActive = false; // Nouveau: track l'état du timer d'inactivité
     
     this.setupAutoCleanup();
     this.setupPageHideCleanup();
@@ -158,7 +159,7 @@ class SecureKeyManager {
     });
   }
 
-  // Nouveau: Méthode pour vérifier si une opération est en cours
+  // Amélioration: Méthode pour vérifier si une opération est en cours
   isOperationInProgress() {
     if (typeof window !== 'undefined' && window.isOperationActive) {
       return window.isOperationActive();
@@ -166,7 +167,7 @@ class SecureKeyManager {
     return false;
   }
 
-  // Nouveau: Méthode pour vérifier si on est dans une phase d'import
+  // Amélioration: Méthode pour vérifier si on est dans une phase d'import/génération
   isWalletOperationInProgress() {
     if (typeof window !== 'undefined' && window.isOperationActive) {
       return window.isOperationActive('import') || 
@@ -178,6 +179,7 @@ class SecureKeyManager {
     return false;
   }
 
+  // CORRECTION PRINCIPALE: Distinction entre types de nettoyage
   clearAll(reason = 'unknown') {
     try {
       this.lastClearReason = reason;
@@ -191,9 +193,13 @@ class SecureKeyManager {
         this.cleanupTimer = null;
       }
       
-      if (this.inactivityTimer) {
-        clearTimeout(this.inactivityTimer);
-        this.inactivityTimer = null;
+      // CORRECTION: Ne pas arrêter le timer d'inactivité sauf pour les vrais timeouts
+      if (reason === 'inactivity_timeout' || reason === 'session_timeout') {
+        if (this.inactivityTimer) {
+          clearTimeout(this.inactivityTimer);
+          this.inactivityTimer = null;
+        }
+        this.isInactivityActive = false;
       }
       
       if (this.displayTimer) {
@@ -209,10 +215,10 @@ class SecureKeyManager {
       eventBus.emit(EVENTS.KEYS_CLEARED, { reason });
       
       // CORRECTION: Auto-reload seulement pour les vrais timeouts de sécurité
-      if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR && reason === 'security_timeout') {
+      const securityTimeouts = ['inactivity_timeout', 'session_timeout'];
+      if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR && securityTimeouts.includes(reason)) {
+        console.log(`[SECURITY] Security timeout detected (${reason}), scheduling auto-reload`);
         this.scheduleAutoReload();
-      } else if (reason === 'security_timeout') {
-        console.log('[SECURITY] Security timeout detected, but auto-reload is disabled');
       } else {
         console.log(`[SECURITY] Keys cleared for reason: ${reason}, no auto-reload needed`);
       }
@@ -255,7 +261,7 @@ class SecureKeyManager {
       return;
     }
     
-    // Afficher une notification avant le rechargement
+    // CORRECTION: Afficher une notification traduite avant le rechargement
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -269,6 +275,9 @@ class SecureKeyManager {
       backdrop-filter: blur(10px);
     `;
     
+    const title = getTranslation('security.session_expired_title', 'Session expirée');
+    const message = getTranslation('security.auto_reload_message', 'Rechargement automatique...');
+    
     overlay.innerHTML = `
       <div style="
         background: ${isDarkMode ? '#1a202c' : '#ffffff'};
@@ -280,8 +289,8 @@ class SecureKeyManager {
         border: 2px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
       ">
         <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
-        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">Session expirée</div>
-        <div style="opacity: 0.8;">Rechargement automatique...</div>
+        <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">${title}</div>
+        <div style="opacity: 0.8;">${message}</div>
       </div>
     `;
     
@@ -299,23 +308,29 @@ class SecureKeyManager {
     }, 5000);
   }
 
+  // CORRECTION PRINCIPALE: Amélioration de la gestion du timer d'inactivité
   updateAccess() {
-    this.lastAccess = Date.now();
+    const now = Date.now();
+    this.lastAccess = now;
+    
+    // CORRECTION: Réinitialiser complètement le timer d'inactivité
     this.resetInactivityTimer();
+    
+    console.log(`[SECURITY] Access updated, timer reset to 10 minutes`);
   }
 
   setupAutoCleanup() {
     if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
     this.cleanupTimer = setTimeout(() => {
-      // CORRECTION: Spécifier la raison
+      // CORRECTION: Spécifier la raison correcte
       this.clearAll('session_timeout');
     }, SECURITY_CONFIG.SESSION_TIMEOUT);
   }
 
   setupPageHideCleanup() {
     const cleanup = () => {
-      // CORRECTION: Spécifier la raison
-      this.clearAll('page_unload');
+      // CORRECTION: Spécifier la raison et ne nettoyer que l'affichage
+      this.clearSensitiveDisplayOnly('page_unload');
       this.clearSensitiveFields();
     };
     
@@ -323,21 +338,29 @@ class SecureKeyManager {
     window.addEventListener('beforeunload', cleanup);
   }
 
+  // CORRECTION PRINCIPALE: Gestion complète du timer d'inactivité
   setupInactivityTimer() {
+    this.isInactivityActive = true;
     this.resetInactivityTimer();
     this.startTimerDisplay();
   }
 
   resetInactivityTimer() {
+    // CORRECTION: Nettoyer l'ancien timer et en créer un nouveau
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
     }
     
+    // CORRECTION: Créer un nouveau timer de 10 minutes exactement
     this.inactivityTimer = setTimeout(() => {
-      // CORRECTION: Spécifier la raison et ne nettoyer que les données sensibles affichées
+      console.log('[SECURITY] Inactivity timeout reached - clearing sensitive data');
       this.clearSensitiveData('inactivity_timeout');
-      eventBus.emit(EVENTS.SESSION_EXPIRED);
+      eventBus.emit(EVENTS.SESSION_EXPIRED, { reason: 'inactivity' });
     }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
+    
+    this.isInactivityActive = true;
+    console.log(`[SECURITY] Inactivity timer reset - ${SECURITY_CONFIG.INACTIVITY_TIMEOUT / 60000} minutes`);
   }
 
   startTimerDisplay() {
@@ -363,13 +386,17 @@ class SecureKeyManager {
     
     timerElement.textContent = `[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}]`;
     
-    if (remaining <= 0) {
+    // CORRECTION: Quand le timer atteint 0, déclencher le timeout
+    if (remaining <= 0 && this.isInactivityActive) {
       clearInterval(this.displayTimer);
+      this.displayTimer = null;
     }
   }
 
-  // CORRECTION: Ne pas nettoyer les clés stockées, seulement l'affichage
+  // CORRECTION: Distinction entre nettoyage d'affichage et nettoyage complet
   clearSensitiveData(reason = 'inactivity') {
+    console.log(`[SECURITY] Clearing sensitive display data (reason: ${reason}), wallet keys preserved`);
+    
     const sensitiveElements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -382,11 +409,38 @@ class SecureKeyManager {
       const element = document.getElementById(id);
       if (element) {
         element.textContent = '';
+        element.classList.add('blurred');
       }
     });
 
-    console.log(`[SECURITY] Sensitive display data cleared (reason: ${reason}), wallet keys preserved`);
-    eventBus.emit(EVENTS.INACTIVITY_WARNING);
+    // CORRECTION: Émettre l'événement avec la raison
+    eventBus.emit(EVENTS.INACTIVITY_WARNING, { reason });
+    
+    // CORRECTION: Pour les vrais timeouts d'inactivité, déclencher l'auto-reload
+    if (reason === 'inactivity_timeout' && FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) {
+      this.scheduleAutoReload();
+    }
+  }
+
+  // NOUVELLE MÉTHODE: Nettoyage d'affichage seulement (pour page unload)
+  clearSensitiveDisplayOnly(reason = 'page_unload') {
+    console.log(`[SECURITY] Clearing sensitive display only (reason: ${reason})`);
+    
+    const sensitiveElements = [
+      ELEMENT_IDS.HD_MASTER_KEY,
+      ELEMENT_IDS.MNEMONIC_PHRASE,
+      ELEMENT_IDS.GENERATED_ADDRESS,
+      'privateKey',
+      'privateKeyHex'
+    ];
+
+    sensitiveElements.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = '';
+        element.classList.add('blurred');
+      }
+    });
   }
 
   clearSensitiveFields() {
@@ -399,7 +453,9 @@ class SecureKeyManager {
     });
   }
 
+  // CORRECTION: S'assurer que chaque action utilisateur réinitialise le timer
   updateLastActionTime() {
+    console.log('[SECURITY] User action detected - resetting inactivity timer');
     this.updateAccess();
   }
 }
@@ -716,12 +772,20 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
 // === TIMER MANAGEMENT ===
 const timerContext = new TimerContext();
 
+// CORRECTION PRINCIPALE: Amélioration de armInactivityTimerSafely
 export function armInactivityTimerSafely() {
   try {
+    console.log('[SECURITY] armInactivityTimerSafely called - resetting timer');
+    
     if (timerContext.hasContext('generation')) {
       if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
         keyManager.updateLastActionTime();
       }
+    }
+    
+    // CORRECTION: Toujours réinitialiser le timer d'inactivité
+    if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
+      keyManager.updateLastActionTime();
     }
     
     eventBus.emit(EVENTS.TIMER_ARM_REQUEST);
@@ -753,8 +817,17 @@ eventBus.on(EVENTS.KEYS_CLEARED, (data) => {
   console.log('[SECURITY] Keys cleared event received:', data?.reason || 'unknown reason');
 });
 
-eventBus.on(EVENTS.SESSION_EXPIRED, () => {
-  console.log('[SECURITY] Session expired event received');
+eventBus.on(EVENTS.SESSION_EXPIRED, (data) => {
+  console.log('[SECURITY] Session expired event received:', data);
+  
+  // CORRECTION: Afficher un avertissement traduit avant l'auto-reload
+  const warningMsg = getTranslation('security.session_timeout_warning', 
+    'Session expirée pour cause d\'inactivité. Le wallet va se recharger automatiquement.');
+  
+  // Afficher une notification non-bloquante
+  if (window.showNotification) {
+    window.showNotification(warningMsg, 'warning');
+  }
 });
 
 // === GLOBAL COMPATIBILITY ===
@@ -777,5 +850,3 @@ if (document.readyState === 'loading') {
   
   console.log('[SECURITY] Security layer initialized - Version 2.0.0');
 }
-
-console.log('Security module loaded - Version 2.0.0');
