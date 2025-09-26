@@ -783,12 +783,14 @@ export function clearBlockchainCaches() {
   
   console.log(`[CACHE] Blockchain caches cleared (${sizeBefore} entries removed)`);
   
-  // Emit event for tracking
-  eventBus.emit(EVENTS.SYSTEM_ERROR, {
-    type: 'cache_cleared',
-    timestamp: Date.now(),
-    entriesCleared: sizeBefore
-  });
+  // CORRECTION: Ne plus émettre d'événement SYSTEM_ERROR qui déclenche le nettoyage des clés de sécurité
+  // Les caches blockchain peuvent être nettoyés sans déclencher les mécanismes de sécurité
+  
+  // Optionnel: émettre un événement spécifique pour le nettoyage de cache si nécessaire pour le monitoring
+  // eventBus.emit(EVENTS.BLOCKCHAIN_CACHE_CLEARED, {
+  //   timestamp: Date.now(),
+  //   entriesCleared: sizeBefore
+  // });
 }
 
 // === GLOBAL RPC CLIENT INSTANCE ===
