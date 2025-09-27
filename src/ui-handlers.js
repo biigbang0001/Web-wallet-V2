@@ -780,6 +780,19 @@ function setupImportHandlers() {
     }
   });
 
+  addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
+    armInactivityTimerSafely();
+    
+    try {
+      setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
+      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
+await updateBalanceWithCacheClear();
+    } catch (error) {
+      console.error('[UI] Refresh balance error:', error);
+    } finally {
+      setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, false);
+    }
+  });
   
   console.log('[UI] Import handlers setup completed');
 }
@@ -834,27 +847,96 @@ function setupTransactionHandlers() {
     ? window.i18next.t 
     : (key, fallback) => fallback || key;
     
-  addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
-    armInactivityTimerSafely();
-    
-    try {
-      if (!window.isWalletReady || !window.isWalletReady()) {
-        const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet');
-        alert(errorMsg);
-        return;
-      }
-      
-      const balanceEl = document.getElementById('totalBalance');
-if (balanceEl) {
-  const txt = (balanceEl.textContent || '').replace(/[^0-9.]/g, '');
-  const currentBal = parseFloat(txt) || 0;
-  const maxAmount = Math.max(0, currentBal - 0.0001);
-  document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = maxAmount.toFixed(8);
-}
-    } catch (error) {
-      console.error('[UI] MAX button error:', error);
+  
+addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
+  armInactivityTimerSafely();
+  try {
+    if (!window.isWalletReady || !window.isWalletReady()) {
+      const errorMsg = getTranslation('errors.import_first', "Importez d'abord un wallet");
+      alert(errorMsg);
+      return;
     }
-  });
+
+    const selectedType = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE)?.value || 'bech32';
+
+    let sourceAddress;
+    if (selectedType === 'p2tr') {
+      sourceAddress = window.taprootAddress || '';
+    } else {
+      sourceAddress = window.bech32Address || '';
+    }
+    const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
+    if (!sourceAddress) {
+      console.warn('[UI] MAX: no source address for type', selectedType);
+      if (amtEl) amtEl.value = '0.00000000';
+      return;
+    }
+
+    const isHD = (typeof window.hdManager !== 'undefined' && !!window.hdManager.hdWallet);
+    const hdWallet = isHD ? window.hdManager.hdWallet : null;
+
+    if (typeof window.utxos !== 'function') {
+      console.warn('[UI] MAX: window.utxos is not a function');
+      if (amtEl) amtEl.value = '0.00000000';
+      return;
+    }
+
+    let allUtxos = await window.utxos(sourceAddress, isHD, hdWallet);
+    allUtxos = Array.isArray(allUtxos) ? allUtxos : [];
+
+    const allowed = selectedType === 'p2tr' ? ['p2tr'] : ['p2wpkh','p2pkh','p2sh'];
+    const spendables = allUtxos.filter(u => allowed.includes(u.scriptType));
+
+    if (!spendables.length) {
+      if (amtEl) amtEl.value = '0.00000000';
+      return;
+    }
+
+    const total = spendables.reduce((s, u) => s + (typeof u.amount === 'number' ? u.amount : parseFloat(u.amount) || 0), 0);
+
+    // ---- Fee estimation (local helper, no imports) ----
+    async function getRealFeeRate() {
+      try {
+        if (!window.rpc) return 0.00001;
+        const [feeInfo, mempoolInfo, networkInfo] = await Promise.allSettled([
+          window.rpc('estimatesmartfee', [6]),
+          window.rpc('getmempoolinfo', []),
+          window.rpc('getnetworkinfo', [])
+        ]);
+        const estimatedRate = (feeInfo.status === 'fulfilled' && feeInfo.value && feeInfo.value.feerate) ? feeInfo.value.feerate : 0.00001;
+        const mempoolMinFee = (mempoolInfo.status === 'fulfilled' && mempoolInfo.value && mempoolInfo.value.mempoolminfee) ? mempoolInfo.value.mempoolminfee : 0.00001;
+        const relayFee = (networkInfo.status === 'fulfilled' && networkInfo.value && networkInfo.value.relayfee) ? networkInfo.value.relayfee : 0.00001;
+        return Math.max(estimatedRate, mempoolMinFee, relayFee, 0.00001);
+      } catch (e) {
+        return 0.00001;
+      }
+    }
+    function estimateVBytes(inputType, numInputs, numOutputs = 2) {
+      const inputSizes = { p2pkh: 148, p2wpkh: 68, p2sh: 91, p2tr: 57.5 };
+      const outputSize = 31;
+      const overhead = 10;
+      const inputSize = inputSizes[inputType] || inputSizes.p2wpkh;
+      return overhead + (inputSize * numInputs) + (outputSize * numOutputs);
+    }
+    function calculateFeeForVsize(vbytes, feeRate) {
+      return Math.ceil(vbytes * (feeRate * 1e8) / 1000);
+    }
+    // ---------------------------------------------------
+
+    const feeRate = await getRealFeeRate();
+    const inputType = selectedType === 'p2tr' ? 'p2tr' : 'p2wpkh';
+    const vbytes = estimateVBytes(inputType, spendables.length, 2);
+    const feeSats = calculateFeeForVsize(vbytes, feeRate);
+    const feeNito = feeSats / 1e8;
+
+    const maxAmount = Math.max(0, total - feeNito);
+    if (amtEl) amtEl.value = maxAmount.toFixed(8);
+  } catch (error) {
+    console.error('[UI] MAX computation error:', error);
+    const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
+    if (amtEl) amtEl.value = '0.00000000';
+  }
+});
 
   addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
@@ -978,6 +1060,19 @@ if (balanceEl) {
     copyToClipboard(ELEMENT_IDS.SIGNED_TX);
   });
 
+  addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
+    armInactivityTimerSafely();
+    
+    try {
+      setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
+      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
+await updateBalanceWithCacheClear();
+      } catch (error) {
+      console.error('[UI] Send tab balance refresh error:', error);
+    } finally {
+      setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, false);
+    }
+  });
   
   console.log('[UI] Transaction handlers setup completed');
 }
