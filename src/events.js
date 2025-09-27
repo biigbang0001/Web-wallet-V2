@@ -58,7 +58,7 @@ const EVENT_SCHEMAS = {
   [EVENTS.WALLET_INFO_RESPONSE]: ['address', 'isReady']
 };
 
-// === ENHANCED EVENT MEDIATOR WITH COMPREHENSIVE PROTECTION ===
+// === ENHANCED EVENT MEDIATOR ===
 export class EventMediator {
   constructor(options = {}) {
     this.listeners = new Map();
@@ -113,7 +113,7 @@ export class EventMediator {
     return hash.toString(36);
   }
 
-  // === CORE EVENT METHODS WITH ENHANCED PROTECTION ===
+  // === CORE EVENT METHODS ===
   on(event, callback, options = {}) {
     if (!this._validateEvent(event, callback)) return false;
     
@@ -427,7 +427,7 @@ export class EventMediator {
     });
   }
 
-  // === ENHANCED CLEANUP METHODS ===
+  // === CLEANUP METHODS ===
   cleanup() {
     const now = Date.now();
     const maxAge = 900000;
@@ -546,9 +546,7 @@ export class EventMediator {
       this.eventHistory.length = 0;
     }
     
-    if (this.debugMode) {
-      console.log('[EVENTS] EventMediator destroyed');
-    }
+    console.log('[EVENTS] EventMediator destroyed');
   }
 
   // === PRIVATE METHODS ===
@@ -686,7 +684,7 @@ export const armSecurityTimer = () => {
   eventBus.emit(EVENTS.TIMER_ARM_REQUEST);
 };
 
-// === ENHANCED PAGE UNLOAD CLEANUP ===
+// === PAGE UNLOAD CLEANUP ===
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     eventBus.destroy();
