@@ -1,32 +1,94 @@
-<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Engrenage qui tourne">
+<svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deux engrenages imbriqués animés">
   <defs>
     <style>
-      .metal { fill:#697386; }
-      .hub { fill:#A7B0C0; }
-      .bg { fill:#ffffff; }
+      .bg { fill: none; }
+      .steel { fill: #6b7280; }      /* gris doux */
+      .steel2 { fill: #94a3b8; }     /* gris clair pour contraste */
+      .hub { fill: #e5e7eb; }
+      .tooth { rx: 2; }
     </style>
-  </defs>
-  <rect class="bg" width="120" height="120" fill="none"/>
-  <g transform="translate(60,60)">
-    <!-- dents -->
-    <g id="teeth">
-      <!-- 8 dents -->
-      <rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/>
-      <g transform="rotate(45)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(90)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(135)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(180)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(225)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(270)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
-      <g transform="rotate(315)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+
+    <!-- Gabarit d'un engrenage à 12 dents (pas de 30°) -->
+    <g id="gear12">
+      <!-- Couronne -->
+      <circle r="28" class="steel"/>
+      <circle r="18" class="hub"/>
+      <!-- Dents -->
+      <g>
+        <!-- dent à 0° -->
+        <rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/>
+        <!-- Répétitions -->
+        <g transform="rotate(30)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(60)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(90)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(120)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(150)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(180)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(210)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(240)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(270)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(300)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+        <g transform="rotate(330)"><rect class="steel tooth" x="-4.5" y="-36" width="9" height="12"/></g>
+      </g>
+      <!-- Trou central -->
+      <circle r="4" fill="#9ca3af"/>
     </g>
-    <!-- couronne -->
-    <circle r="40" fill="#7D889B"/>
-    <circle r="28" fill="#E5E9F0"/>
-    <!-- moyeu -->
-    <circle r="10" class="hub"/>
-    <!-- rotation -->
-    <animateTransform attributeName="transform" type="rotate"
-      from="0 0 0" to="360 0 0" dur="2s" repeatCount="indefinite"/>
+
+    <!-- Gabarit d'un engrenage à 18 dents (pas de 20°) -->
+    <g id="gear18">
+      <!-- Couronne -->
+      <circle r="42" class="steel2"/>
+      <circle r="28" class="hub"/>
+      <!-- Dents -->
+      <g>
+        <!-- dent à 0° -->
+        <rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/>
+        <!-- Répétitions -->
+        <g transform="rotate(20)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(40)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(60)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(80)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(100)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(120)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(140)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(160)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(180)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(200)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(220)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(240)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(260)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(280)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(300)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(320)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+        <g transform="rotate(340)"><rect class="steel2 tooth" x="-4" y="-50" width="8" height="14"/></g>
+      </g>
+      <!-- Trou central -->
+      <circle r="5" fill="#cbd5e1"/>
+    </g>
+  </defs>
+
+  <!-- Zone neutre -->
+  <rect class="bg" width="200" height="120"/>
+
+  <!-- Groupe global centré -->
+  <g transform="translate(100,60)">
+    <!-- Centres calculés pour que les cercles de pas se touchent (28 et 42 => écart 70) -->
+    <!-- On place le centre global au milieu des deux : -35 et +35 sur l'axe X -->
+    <g id="left-gear" transform="translate(-35,0)">
+      <use href="#gear12">
+        <!-- 12 dents => rotation complète 360°. On choisit 4s -->
+        <animateTransform attributeName="transform" type="rotate"
+          from="0" to="360" dur="4s" repeatCount="indefinite"/>
+      </use>
+    </g>
+
+    <g id="right-gear" transform="translate(35,0)">
+      <use href="#gear18">
+        <!-- Rapport dents 12:18 = 2:3 => vitesse angulaire = 2/3 de l'autre, sens inverse -->
+        <!-- Si le petit fait +360°/4s, le grand fait -240°/4s -->
+        <animateTransform attributeName="transform" type="rotate"
+          from="0" to="-240" dur="4s" repeatCount="indefinite"/>
+      </use>
+    </g>
   </g>
 </svg>
