@@ -352,7 +352,7 @@ function setupGenerationHandlers() {
       
     try {
       if (window.startOperation) window.startOperation('generation');
-      if (window.showLoading) window.showLoading(true);
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(true, 'loading.wallet_setup');
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, true);
       
       armInactivityTimerSafely();
@@ -389,7 +389,7 @@ function setupGenerationHandlers() {
       alert(errorMsg);
       console.error('[UI] Generation error:', error);
     } finally {
-      if (window.showLoading) window.showLoading(false);
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, false);
       if (window.endOperation) window.endOperation('generation');
     }
@@ -657,9 +657,14 @@ function setupTransactionHandlers() {
       return;
     }
     
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+    
     try {
       if (window.startOperation) window.startOperation('transaction');
-      if (window.showLoading) window.showLoading(t('loading.preparing_transaction', 'Préparation de la transaction...'));
+      // Utiliser showBalanceLoadingSpinner au lieu de showLoading pour éviter les conflits
+      if (window.showBalanceLoadingSpinner) {
+        window.showBalanceLoadingSpinner(true, 'loading.connecting');
+      }
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, true);
       
       const to = document.getElementById(ELEMENT_IDS.DESTINATION_ADDRESS)?.value?.trim();
@@ -701,7 +706,10 @@ function setupTransactionHandlers() {
       alert(errorMsg);
       console.error('[UI] Transaction preparation error:', error);
     } finally {
-      if (window.hideLoading) window.hideLoading();
+      // S'assurer de fermer le bon spinner
+      if (window.showBalanceLoadingSpinner) {
+        window.showBalanceLoadingSpinner(false);
+      }
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, false);
       if (window.endOperation) window.endOperation('transaction');
     }
@@ -714,9 +722,14 @@ function setupTransactionHandlers() {
       return;
     }
     
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+    
     try {
       if (window.startOperation) window.startOperation('broadcast');
-      if (window.showLoading) window.showLoading(true);
+      // Utiliser showBalanceLoadingSpinner pour éviter les conflits
+      if (window.showBalanceLoadingSpinner) {
+        window.showBalanceLoadingSpinner(true, 'loading.connecting');
+      }
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, true);
       
       const hex = document.getElementById(ELEMENT_IDS.SIGNED_TX)?.textContent;
@@ -754,7 +767,10 @@ function setupTransactionHandlers() {
       alert(errorMsg);
       console.error('[UI] Broadcast error:', error);
     } finally {
-      if (window.showLoading) window.showLoading(false);
+      // S'assurer de fermer le bon spinner
+      if (window.showBalanceLoadingSpinner) {
+        window.showBalanceLoadingSpinner(false);
+      }
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, false);
       if (window.endOperation) window.endOperation('broadcast');
     }
