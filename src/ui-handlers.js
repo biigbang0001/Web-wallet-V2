@@ -381,37 +381,45 @@ function clearInputFields() {
   if (passwordField) passwordField.value = '';
 }
 
-// === MISE À JOUR DU SÉLECTEUR D'ADRESSE ===
-function updateAddressTypeSelector(importType) {
+// === GESTION DU SÉLECTEUR D'ADRESSE ===
+function updateAddressSelector(importType) {
   const selector = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE);
   if (!selector) return;
-  
-  // Sauvegarder la sélection actuelle
+
+  // Sauvegarder la valeur actuelle
   const currentValue = selector.value;
   
-  // Vider le sélecteur
+  // Effacer les options existantes
   selector.innerHTML = '';
   
-  // Toujours ajouter Bech32
-  const bech32Option = document.createElement('option');
-  bech32Option.value = 'bech32';
-  bech32Option.setAttribute('data-i18n', 'send_section.bech32_option');
-  bech32Option.textContent = 'Bech32';
-  selector.appendChild(bech32Option);
-  
-  // Ajouter Taproot seulement pour les wallets HD
-  if (importType === 'hd') {
+  if (importType === 'hd' || importType === 'email' || importType === 'mnemonic' || importType === 'xprv') {
+    // HD Wallet : Bech32 + Taproot
+    const bech32Option = document.createElement('option');
+    bech32Option.value = 'bech32';
+    bech32Option.selected = true;
+    bech32Option.setAttribute('data-i18n', 'send_section.bech32_option');
+    bech32Option.textContent = 'Bech32';
+    selector.appendChild(bech32Option);
+    
     const taprootOption = document.createElement('option');
     taprootOption.value = 'p2tr';
     taprootOption.textContent = 'Bech32m (Taproot)';
     selector.appendChild(taprootOption);
-  }
-  
-  // Restaurer la sélection si possible, sinon bech32 par défaut
-  if (importType === 'hd' && currentValue === 'p2tr') {
-    selector.value = 'p2tr';
+    
+    // Restaurer la valeur si possible
+    if (currentValue === 'p2tr') {
+      selector.value = 'p2tr';
+    } else {
+      selector.value = 'bech32';
+    }
   } else {
-    selector.value = 'bech32';
+    // Clé simple (WIF/Hex) : Seulement Bech32
+    const bech32Option = document.createElement('option');
+    bech32Option.value = 'bech32';
+    bech32Option.selected = true;
+    bech32Option.setAttribute('data-i18n', 'send_section.bech32_option');
+    bech32Option.textContent = 'Bech32';
+    selector.appendChild(bech32Option);
   }
 }
 
@@ -426,60 +434,57 @@ function displayWalletInfo(addresses, importType) {
   if (walletAddressElement && addresses) {
     const balanceText = getTranslation('import_section.balance', 'Solde:');
     
-    // Affichage différent selon le type d'import
-    let displayHtml = '';
-    if (importType === 'hd') {
-      displayHtml = `
+    // Affichage selon le type d'import
+    if (importType === 'hd' || importType === 'email' || importType === 'mnemonic' || importType === 'xprv') {
+      // HD Wallet : afficher Bech32 + Taproot
+      walletAddressElement.innerHTML = `
         <div style="margin-top: 10px;">
           <strong>Bech32:</strong> ${addresses.bech32}<br>
           <strong>Taproot:</strong> ${addresses.taproot}
         </div>
+        <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
+          ${balanceText} 0.00000000 NITO
+        </div>
       `;
     } else {
-      displayHtml = `
+      // Clé simple : afficher seulement Bech32
+      walletAddressElement.innerHTML = `
         <div style="margin-top: 10px;">
           <strong>Bech32:</strong> ${addresses.bech32}
+        </div>
+        <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
+          ${balanceText} 0.00000000 NITO
         </div>
       `;
     }
     
-    displayHtml += `
-      <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
-        ${balanceText} 0.00000000 NITO
-      </div>
-    `;
-    
-    walletAddressElement.innerHTML = displayHtml;
-    
     if (addressesSection) {
       addressesSection.style.display = 'block';
       if (bech32Element) bech32Element.value = addresses.bech32 || '';
-      if (taprootElement && importType === 'hd') {
-        taprootElement.value = addresses.taproot || '';
-      }
+      if (taprootElement) taprootElement.value = addresses.taproot || '';
     }
   }
   
-  // Mettre à jour le sélecteur d'adresse selon le type d'import
-  updateAddressTypeSelector(importType);
+  // Mettre à jour le sélecteur d'adresse
+  updateAddressSelector(importType);
   
-  injectConsolidateButton();
-  
-  // PROBLÈME 1 RÉSOLU: Mettre à jour automatiquement le solde total
+  // Mettre à jour le solde automatiquement
   setTimeout(async () => {
     try {
       if (window.getTotalBalance) {
-        const totalBalance = await window.getTotalBalance();
-        const totalBalanceElement = document.getElementById('totalBalance');
-        if (totalBalanceElement) {
+        const total = await window.getTotalBalance();
+        const balanceElement = document.getElementById('totalBalance');
+        if (balanceElement) {
           const balanceText = getTranslation('import_section.balance', 'Solde:');
-          totalBalanceElement.textContent = `${balanceText} ${totalBalance.toFixed(8)} NITO`;
+          balanceElement.textContent = `${balanceText} ${total.toFixed(8)} NITO`;
         }
       }
     } catch (error) {
       console.error('[UI] Auto balance update error:', error);
     }
   }, 1000);
+  
+  injectConsolidateButton();
 }
 
 function injectConsolidateButton() {
@@ -1149,7 +1154,7 @@ if (typeof window !== 'undefined') {
   window.addUniqueEventListener = addUniqueEventListener;
   window.removeEventListener = removeEventListener;
   window.displayWalletInfo = displayWalletInfo;
-  window.updateAddressTypeSelector = updateAddressTypeSelector;
+  window.updateAddressSelector = updateAddressSelector;
 }
 
 console.log('UI handlers module loaded - Version 2.0.0');
