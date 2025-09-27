@@ -478,8 +478,6 @@ export class HDWalletManager {
     }
 
     try {
-      armInactivityTimerSafely();
-      
       const { bitcoin, ECPair } = window;
       if (!bitcoin || !ECPair) {
         throw new Error('Bitcoin libraries not available');
@@ -496,19 +494,16 @@ export class HDWalletManager {
 
       console.log('[WALLET] Creating payment objects...');
       
-      // Legacy P2PKH
       const p2pkh = bitcoin.payments.p2pkh({ 
         pubkey: Buffer.from(legacyNode.publicKey), 
         network: NITO_NETWORK 
       });
       
-      // Native Bech32 P2WPKH
       const p2wpkh = bitcoin.payments.p2wpkh({ 
         pubkey: pubkey, 
         network: NITO_NETWORK 
       });
       
-      // P2SH wrapped SegWit
       const p2sh = bitcoin.payments.p2sh({
         redeem: bitcoin.payments.p2wpkh({ 
           pubkey: Buffer.from(p2shNode.publicKey), 
@@ -517,7 +512,6 @@ export class HDWalletManager {
         network: NITO_NETWORK
       });
 
-      // Taproot P2TR (Bech32m)
       console.log('[WALLET] Creating Taproot address...');
       const tapInternalPubkey = TaprootUtils.toXOnly(taprootNode.publicKey);
       const p2tr = bitcoin.payments.p2tr({ 
@@ -602,8 +596,6 @@ export class HDWalletManager {
   }
 
   async scanHdUtxosForFamily(family) {
-    armInactivityTimerSafely();
-    
     console.log(`[UTXO_SCAN] Scanning ${family} family for HD wallet...`);
     const allUtxos = [];
     const seen = new Set();
@@ -647,10 +639,6 @@ export class HDWalletManager {
           if (keyInfo.redeemScript) enriched.redeemScript = keyInfo.redeemScript;
         }
         allUtxos.push(enriched);
-      }
-      
-      if (chunk % 5 === 0) {
-        armInactivityTimerSafely();
       }
     }
 
@@ -733,8 +721,6 @@ export class HDWalletManager {
   }
 
   async utxosAllForBech32() {
-    armInactivityTimerSafely();
-    
     console.log('[UTXO_SCAN] Scanning all families for Bech32 cumulative balance...');
     const families = ['bech32', 'p2sh', 'legacy'];
     const parts = [];
@@ -744,8 +730,6 @@ export class HDWalletManager {
         const familyUtxos = await this.scanHdUtxosForFamily(fam); 
         parts.push(familyUtxos);
         console.log(`[UTXO_SCAN] ${fam}: ${familyUtxos.length} UTXOs`);
-        
-        armInactivityTimerSafely();
       } catch (e) {
         console.warn(`[UTXO_SCAN] Failed to scan ${fam}:`, e);
         parts.push([]);
@@ -768,8 +752,6 @@ export class HDWalletManager {
   }
 
   async utxosForTaproot() {
-    armInactivityTimerSafely();
-    
     console.log('[UTXO_SCAN] Scanning Taproot UTXOs specifically...');
     return await this.scanHdUtxosForFamily('taproot');
   }
@@ -798,8 +780,6 @@ class WalletState {
 
   setupEventListeners() {
     eventBus.on(EVENTS.WALLET_INFO_REQUEST, () => {
-      armInactivityTimerSafely();
-      
       eventBus.emit(EVENTS.WALLET_INFO_RESPONSE, {
         address: this.bech32Address,
         isReady: this.isReady(),
@@ -829,8 +809,6 @@ class WalletState {
       console.log('[SECURITY] Inactivity timeout reached - clearing sensitive display data only');
       this.clearSensitiveData();
     }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
-    
-    console.log(`[SECURITY] Inactivity timer reset to ${SECURITY_CONFIG.INACTIVITY_TIMEOUT / 60000} minutes`);
   }
 
   clearSensitiveData() {
@@ -860,8 +838,6 @@ class WalletState {
 
   async getWalletKeyPair() {
     try {
-      armInactivityTimerSafely();
-      
       const keyData = await keyManager.getKey('bech32KeyPair');
       if (!keyData) return null;
       
@@ -874,8 +850,6 @@ class WalletState {
 
   async getWalletPublicKey() {
     try {
-      armInactivityTimerSafely();
-      
       const keyData = await keyManager.getKey('bech32KeyPair');
       if (!keyData) return null;
       return Buffer.from(keyData.publicKey, 'hex');
@@ -886,8 +860,6 @@ class WalletState {
 
   async getTaprootKeyPair() {
     try {
-      armInactivityTimerSafely();
-      
       const keyData = await keyManager.getKey('taprootKeyPair');
       if (!keyData) return null;
       
@@ -901,8 +873,6 @@ class WalletState {
 
   async getTaprootPublicKey() {
     try {
-      armInactivityTimerSafely();
-      
       const keyData = await keyManager.getKey('taprootKeyPair');
       if (!keyData) return null;
       return Buffer.from(keyData.publicKey, 'hex');
@@ -921,8 +891,6 @@ class WalletState {
     startOperation('balance-update');
     
     try {
-      armInactivityTimerSafely();
-      
       let total = 0;
       
       if (window.balance) {
@@ -932,16 +900,12 @@ class WalletState {
           const bech32Balance = await window.balance(this.bech32Address, this.importType === 'hd', this.importType === 'hd' ? hdManager.hdWallet : null);
           total += bech32Balance || 0;
           console.log(`[BALANCE] Bech32 balance: ${bech32Balance} NITO`);
-          
-          armInactivityTimerSafely();
         }
         
         if (this.taprootAddress && this.importType === 'hd') {
           const taprootBalance = await window.balance(this.taprootAddress, true, hdManager.hdWallet);
           total += taprootBalance || 0;
           console.log(`[BALANCE] Taproot balance: ${taprootBalance} NITO`);
-          
-          armInactivityTimerSafely();
         }
         
         console.log(`[BALANCE] Total balance: ${total} NITO`);
@@ -1109,8 +1073,6 @@ export async function importWallet(arg1, arg2) {
       console.log(getTranslation('wallet.email_connection_started', 'Connexion email démarrée, génération du portefeuille...'));
       const mnemonic = await deriveFromCredentials(email, password, 24);
       
-      armInactivityTimerSafely();
-      
       const addresses = await hdManager.importHDWallet(mnemonic);
       
       walletState.legacyAddress = addresses.legacy;
@@ -1251,8 +1213,6 @@ export async function utxos(addr, isHD = false, hdWallet = null) {
   startOperation('utxo-scan');
   
   try {
-    armInactivityTimerSafely();
-    
     console.log(`[UTXO] Scanning UTXOs for address: ${addr}, HD: ${isHD}`);
     
     if (isHD && hdWallet) {
@@ -1299,8 +1259,6 @@ export async function balance(addr, isHD = false, hdWallet = null) {
   }
 
   try {
-    armInactivityTimerSafely();
-    
     console.log(`[BALANCE] Calculating balance for: ${addr}, HD: ${isHD}`);
     
     if (isHD && hdWallet) {
@@ -1312,23 +1270,17 @@ export async function balance(addr, isHD = false, hdWallet = null) {
         const utxoList = await hdManager.utxosAllForBech32();
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Cumulative balance: ${total} NITO`);
-        
-        armInactivityTimerSafely();
         return total;
       } else if (addressType === 'p2tr') {
         console.log('[BALANCE] Taproot balance calculation');
         const utxoList = await hdManager.utxosForTaproot();
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Taproot balance: ${total} NITO`);
-        
-        armInactivityTimerSafely();
         return total;
       } else {
         const utxoList = await utxos(addr, true, hdWallet);
         const total = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
         console.log(`[BALANCE] Standard balance: ${total} NITO`);
-        
-        armInactivityTimerSafely();
         return total;
       }
     } else {
@@ -1336,8 +1288,6 @@ export async function balance(addr, isHD = false, hdWallet = null) {
       const scan = await window.rpc('scantxoutset', ['start', [`addr(${addr})`]]);
       const balance = (scan && scan.total_amount) || 0;
       console.log(`[BALANCE] Single address balance: ${balance} NITO`);
-      
-      armInactivityTimerSafely();
       return balance;
     }
   } catch (error) {
@@ -1352,12 +1302,10 @@ export function isWalletReady() {
 }
 
 export function getWalletAddress() {
-  armInactivityTimerSafely();
   return walletState.bech32Address;
 }
 
 export function getTaprootAddress() {
-  armInactivityTimerSafely();
   return walletState.taprootAddress;
 }
 
@@ -1370,7 +1318,6 @@ export async function getWalletPublicKey() {
 }
 
 export async function getBech32Address() {
-  armInactivityTimerSafely();
   return walletState.bech32Address;
 }
 
@@ -1469,7 +1416,6 @@ if (typeof window !== 'undefined') {
   window.hdManager = hdManager;
   window.utxos = utxos;
   window.balance = balance;
-  
   window.showSuccessPopup = showSuccessPopup;
   
   window.walletAddress = '';
