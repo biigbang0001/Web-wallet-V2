@@ -22,14 +22,6 @@ if (typeof Uint8Array !== 'undefined' && !Uint8Array.prototype.equals) {
   });
 }
 
-// === TRANSLATION HELPER ===
-function getTranslation(key, fallback, params = {}) {
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
-    : () => fallback || key;
-  return t(key, { ...params, defaultValue: fallback });
-}
-
 // === BITCOIN LIBRARIES ACCESS ===
 async function getBitcoinLibraries() {
   await waitForLibraries();
@@ -47,17 +39,15 @@ async function getBitcoinLibraries() {
 // === WALLET INFO ACCESS ===
 let walletInfoCache = null;
 let lastCacheTime = 0;
-const CACHE_DURATION = 2000; // 2 secondes
+const CACHE_DURATION = 2000;
 
 async function getWalletInfo() {
   const now = Date.now();
   
-  // Utiliser le cache si récent
   if (walletInfoCache && (now - lastCacheTime) < CACHE_DURATION) {
     return walletInfoCache;
   }
   
-  // Vérification directe d'abord
   if (window.isWalletReady && window.isWalletReady()) {
     const info = {
       address: window.getWalletAddress ? window.getWalletAddress() : '',
@@ -74,7 +64,6 @@ async function getWalletInfo() {
     return info;
   }
   
-  // Fallback sur les événements uniquement si nécessaire
   try {
     const result = await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('timeout')), 1000);
@@ -89,34 +78,6 @@ async function getWalletInfo() {
     return result;
   } catch (error) {
     return { address: '', isReady: false, addresses: {} };
-  }
-}
-
-// === OPERATIONS TRACKING ===
-function startOperation(operationType) {
-  if (typeof window.startOperation === 'function') {
-    window.startOperation(operationType);
-  } else {
-    OPERATION_STATE.activeOperations.add(operationType);
-  }
-}
-
-function endOperation(operationType) {
-  if (typeof window.endOperation === 'function') {
-    window.endOperation(operationType);
-  } else {
-    OPERATION_STATE.activeOperations.delete(operationType);
-  }
-}
-
-function isOperationActive(operationType = null) {
-  if (typeof window.isOperationActive === 'function') {
-    return window.isOperationActive(operationType);
-  } else {
-    if (operationType) {
-      return OPERATION_STATE.activeOperations.has(operationType);
-    }
-    return OPERATION_STATE.activeOperations.size > 0;
   }
 }
 
@@ -338,7 +299,7 @@ export class SimpleTransactionBuilder {
     
     const walletInfo = await getWalletInfo();
     if (!walletInfo.isReady) {
-      const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+      const errorMsg = window.getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
       throw new Error(errorMsg);
     }
 
@@ -356,7 +317,7 @@ export class SimpleTransactionBuilder {
     }
     
     if (!window.utxos) {
-      const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+      const errorMsg = window.getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
       throw new Error(errorMsg);
     }
 
@@ -366,14 +327,14 @@ export class SimpleTransactionBuilder {
     const rawUtxos = await window.utxos(sourceAddress, isHD, hdWallet);
     
     if (!rawUtxos.length) {
-      const errorMsg = getTranslation('transactions.no_utxos_for_consolidation', 'Aucun UTXO disponible');
+      const errorMsg = window.getTranslation('transactions.no_utxos_for_consolidation', 'Aucun UTXO disponible');
       throw new Error(errorMsg);
     }
 
     const matureUtxos = await filterMatureUtxos(rawUtxos);
     
     if (!matureUtxos.length) {
-      const errorMsg = getTranslation('transactions.no_suitable_utxos', 'Aucun UTXO mature approprié disponible');
+      const errorMsg = window.getTranslation('transactions.no_suitable_utxos', 'Aucun UTXO mature approprié disponible');
       throw new Error(errorMsg);
     }
 
@@ -400,7 +361,7 @@ export class SimpleTransactionBuilder {
     }
 
     if (!workingUtxos.length) {
-      const errorMsg = getTranslation('transactions.no_suitable_utxos', `Aucun UTXO ${selectedAddressType} mature approprié disponible`);
+      const errorMsg = window.getTranslation('transactions.no_suitable_utxos', `Aucun UTXO ${selectedAddressType} mature approprié disponible`);
       throw new Error(errorMsg);
     }
 
@@ -437,7 +398,7 @@ export class SimpleTransactionBuilder {
       
       if (total < target + finalFees) {
         const shortfall = (target + finalFees - total) / 1e8;
-        const errorMsg = getTranslation('transactions.insufficient_funds_detailed', 
+        const errorMsg = window.getTranslation('transactions.insufficient_funds_detailed', 
           `Fonds insuffisants. Utilisez le bouton MAX ou réduisez le montant de ${shortfall.toFixed(8)} NITO pour couvrir les frais.`,
           { amount: shortfall.toFixed(8) }
         );
@@ -461,7 +422,7 @@ export class SimpleTransactionBuilder {
     const change = total - target - fees;
     
     if (change < 0) {
-      const errorMsg = getTranslation('transactions.insufficient_funds_after_fees', 'Fonds insuffisants après calcul des frais');
+      const errorMsg = window.getTranslation('transactions.insufficient_funds_after_fees', 'Fonds insuffisants après calcul des frais');
       throw new Error(errorMsg);
     }
 
@@ -592,19 +553,19 @@ export class SimpleTransactionBuilder {
 
 // === CONSOLIDATE UTXOS ===
 export async function consolidateUtxos() {
-  if (isOperationActive('consolidation')) {
+  if (window.isOperationActive && window.isOperationActive('consolidation')) {
     alert('Consolidation déjà en cours. Veuillez attendre.');
     return;
   }
 
-  startOperation('consolidation');
+  if (window.startOperation) window.startOperation('consolidation');
   armInactivityTimerSafely();
   console.log('[CONSOLIDATION] Starting consolidation...');
 
   try {
     const walletInfo = await getWalletInfo();
     if (!walletInfo.isReady) {
-      const alertMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+      const alertMsg = window.getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
       alert(alertMsg);
       return;
     }
@@ -615,7 +576,7 @@ export async function consolidateUtxos() {
     if (spinner) spinner.style.display = 'block';
 
     if (!window.utxos) {
-      const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+      const errorMsg = window.getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
       throw new Error(errorMsg);
     }
 
@@ -654,7 +615,7 @@ export async function consolidateUtxos() {
     
     if (allUtxos.length < 2) {
       if (spinner) spinner.style.display = 'none';
-      const alertMsg = getTranslation('transactions.need_at_least_utxos',
+      const alertMsg = window.getTranslation('transactions.need_at_least_utxos',
         `Besoin d'au moins 2 UTXOs matures pour consolider. Trouvés: ${allUtxos.length}`,
         { count: 2, found: allUtxos.length }
       );
@@ -672,7 +633,7 @@ export async function consolidateUtxos() {
       batches.push(batch);
     }
 
-    const confirmMsg = getTranslation('transactions.consolidation_confirm',
+    const confirmMsg = window.getTranslation('transactions.consolidation_confirm',
       `Consolider ${allUtxos.length} UTXOs → ${batches.length} UTXO(s)\nTotal: ${totalValue.toFixed(8)} NITO\nType: ${sourceType}\n\nConfirmer?`,
       { 
         count: allUtxos.length, 
@@ -719,7 +680,7 @@ export async function consolidateUtxos() {
         );
         
         if (!window.rpc) {
-          const errorMsg = getTranslation('errors.rpc_unavailable', 'Fonction RPC non disponible');
+          const errorMsg = window.getTranslation('errors.rpc_unavailable', 'Fonction RPC non disponible');
           throw new Error(errorMsg);
         }
         
@@ -749,7 +710,7 @@ export async function consolidateUtxos() {
       await window.showSuccessPopup(finalTxid);
     }
 
-    const successMsg = getTranslation('transactions.consolidation_completed',
+    const successMsg = window.getTranslation('transactions.consolidation_completed',
       `Consolidation terminée!\n${allUtxos.length} UTXOs → ${txids.length} UTXO(s)\nTransactions: ${txids.length}\nType: ${sourceType}`,
       { 
         original: allUtxos.length, 
@@ -772,14 +733,14 @@ export async function consolidateUtxos() {
     const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
     if (spinner) spinner.style.display = 'none';
     
-    const errorMsg = getTranslation('transactions.consolidation_error', 
+    const errorMsg = window.getTranslation('transactions.consolidation_error', 
       `Erreur de consolidation: ${e.message}`,
       { error: e.message }
     );
     alert(errorMsg);
     console.error('[CONSOLIDATION] Error:', e);
   } finally {
-    endOperation('consolidation');
+    if (window.endOperation) window.endOperation('consolidation');
   }
 }
 
@@ -788,7 +749,7 @@ export async function transferToP2SH(amt) {
   armInactivityTimerSafely();
   
   if (!window.getWalletPublicKey) {
-    const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
+    const errorMsg = window.getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
     throw new Error(errorMsg);
   }
   
@@ -838,4 +799,4 @@ if (typeof window !== 'undefined') {
   window.effectiveFeeRate = effectiveFeeRate;
 }
 
-console.log('Transactions module loaded - Version 2.0.0');
+console.log('transactions module loaded - Version 2.0.0');
