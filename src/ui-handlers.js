@@ -130,7 +130,7 @@ function updateAddressSelector(importType) {
   }
 }
 
-function displayWalletInfo(addresses, importType) {
+function displayWalletInfo(addresses, importType, onBalanceUpdated) {
   armInactivityTimerSafely();
   
   const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
@@ -184,8 +184,12 @@ function displayWalletInfo(addresses, importType) {
           balanceElement.textContent = `${balanceText} ${total.toFixed(8)} NITO`;
         }
       }
+      // Appeler le callback pour indiquer que le solde est mis à jour
+      if (onBalanceUpdated) onBalanceUpdated();
     } catch (error) {
       console.error('[UI] Auto balance update error:', error);
+      // En cas d'erreur, fermer quand même le spinner
+      if (onBalanceUpdated) onBalanceUpdated();
     }
   }, 1000);
 }
@@ -427,7 +431,10 @@ function setupImportHandlers() {
       const result = await window.importWallet(input);
       
       if (result.success) {
-        displayWalletInfo(result.addresses, result.importType);
+        // Passer le callback pour fermer le spinner quand le solde est calculé
+        displayWalletInfo(result.addresses, result.importType, () => {
+          if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
+        });
         hideAllAuthForms();
         clearInputFields();
         
@@ -435,13 +442,14 @@ function setupImportHandlers() {
       } else {
         const errorMsg = t('errors.import_failed', `Échec de l'import: ${result.error}`);
         alert(errorMsg);
+        if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
       }
     } catch (error) {
       const errorMsg = t('errors.import_error', `Erreur d'import: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Import error:', error);
-    } finally {
       if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
+    } finally {
       setButtonLoading(ELEMENT_IDS.IMPORT_WALLET_BUTTON, false);
       if (window.endOperation) window.endOperation('import');
     }
@@ -473,7 +481,10 @@ function setupImportHandlers() {
       const result = await window.importWallet(email, password);
       
       if (result.success) {
-        displayWalletInfo(result.addresses, result.importType);
+        // Passer le callback pour fermer le spinner quand le solde est calculé
+        displayWalletInfo(result.addresses, result.importType, () => {
+          if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
+        });
         hideAllAuthForms();
         clearInputFields();
 
@@ -484,13 +495,14 @@ function setupImportHandlers() {
       } else {
         const errorMsg = t('errors.connection_failed', `Échec de la connexion: ${result.error}`);
         alert(errorMsg);
+        if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
       }
     } catch (error) {
       const errorMsg = t('errors.connection_error', `Erreur de connexion: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Connection error:', error);
-    } finally {
       if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
+    } finally {
       setButtonLoading(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, false);
       if (window.endOperation) window.endOperation('email-connect');
     }
@@ -647,7 +659,7 @@ function setupTransactionHandlers() {
     
     try {
       if (window.startOperation) window.startOperation('transaction');
-      if (window.showLoading) window.showLoading(true);
+      if (window.showLoading) window.showLoading(t('loading.preparing_transaction', 'Préparation de la transaction...'));
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, true);
       
       const to = document.getElementById(ELEMENT_IDS.DESTINATION_ADDRESS)?.value?.trim();
@@ -689,7 +701,7 @@ function setupTransactionHandlers() {
       alert(errorMsg);
       console.error('[UI] Transaction preparation error:', error);
     } finally {
-      if (window.showLoading) window.showLoading(false);
+      if (window.hideLoading) window.hideLoading();
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, false);
       if (window.endOperation) window.endOperation('transaction');
     }
