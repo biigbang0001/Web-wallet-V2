@@ -85,7 +85,6 @@ function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
   
   if (show) {
     if (isOperationActive('connection')) {
-      console.log('[UI] Connection already in progress');
       return;
     }
     startOperation('connection');
@@ -252,25 +251,8 @@ function setButtonLoading(buttonId, loading, originalText = null) {
 }
 
 // === BALANCE UPDATE FUNCTIONS ===
-async function updateBalance() {
-  try {
-    armInactivityTimerSafely();
-    
-    if (window.getTotalBalance) {
-      const total = await window.getTotalBalance();
-      const balanceElement = document.getElementById('totalBalance');
-      if (balanceElement) {
-        balanceElement.textContent = total.toFixed(8) + ' NITO';
-      }
-    }
-  } catch (error) {
-    console.error('[UI] Balance update error:', error);
-  }
-}
-
 async function updateBalanceWithAnimation() {
   if (isOperationActive('balance-update')) {
-    console.log('[UI] Balance update already in progress');
     return;
   }
   
@@ -286,7 +268,13 @@ async function updateBalanceWithAnimation() {
       await window.updateSendTabBalance();
     }
     
-    await updateBalance();
+    if (window.getTotalBalance) {
+      const total = await window.getTotalBalance();
+      const balanceElement = document.getElementById('totalBalance');
+      if (balanceElement) {
+        balanceElement.textContent = total.toFixed(8) + ' NITO';
+      }
+    }
     
     if (window.showBalanceLoadingSpinner) {
       window.showBalanceLoadingSpinner(true, 'loading.balance_updated');
@@ -309,7 +297,6 @@ async function updateBalanceWithAnimation() {
 
 async function updateBalanceWithCacheClear() {
   if (isOperationActive('balance-refresh')) {
-    console.log('[UI] Balance refresh already in progress');
     return;
   }
   
@@ -324,7 +311,6 @@ async function updateBalanceWithCacheClear() {
       if (maybePromise && typeof maybePromise.then === 'function') {
         await maybePromise;
       }
-      console.log('[REFRESH] Caches cleared');
     }
     
     await new Promise(r => setTimeout(r, 800));
@@ -334,7 +320,13 @@ async function updateBalanceWithCacheClear() {
       await window.updateSendTabBalance();
     }
     
-    await updateBalance();
+    if (window.getTotalBalance) {
+      const total = await window.getTotalBalance();
+      const balanceElement = document.getElementById('totalBalance');
+      if (balanceElement) {
+        balanceElement.textContent = total.toFixed(8) + ' NITO';
+      }
+    }
     
     showBalanceLoadingSpinner(true, 'loading.balance_updated');
     await new Promise(r => setTimeout(r, 1200));
@@ -426,17 +418,7 @@ function displayWalletInfo(addresses, importType) {
     console.log('========================');
   }
   
-  if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} }
-window.__postImportRefreshTimer = setTimeout(() => {
-  // Use cache-clear variant after import to avoid stale 0 balance
-  // and rely on op guard to prevent overlap
-  if (window.isOperationActive && (window.isOperationActive('balance-update') || window.isOperationActive('balance-refresh'))) {
-    return;
-  }
-  updateBalanceWithCacheClear();
-  window.__postImportRefreshTimer = null;
-}, 1000);
-injectConsolidateButton();
+  injectConsolidateButton();
 }
 
 function injectConsolidateButton() {
@@ -459,7 +441,6 @@ function injectConsolidateButton() {
       armInactivityTimerSafely();
       
       if (isOperationActive('consolidation')) {
-        console.log('[UI] Consolidation already in progress');
         return;
       }
       
@@ -588,13 +569,10 @@ function createSecureSeedButton(mnemonic, containerId) {
 
 // === WALLET GENERATION HANDLERS ===
 function setupGenerationHandlers() {
-  console.log('[UI] Setting up generation handlers...');
-  
   addUniqueEventListener(ELEMENT_IDS.GENERATE_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
     
     if (isOperationActive('generation')) {
-      console.log('[UI] Generation already in progress');
       return;
     }
     
@@ -629,11 +607,7 @@ function setupGenerationHandlers() {
           console.warn('[UI] Counter update failed:', e);
         }
 
-        const logMessage = getTranslation('wallet.hd_wallet_generated', 
-          'Portefeuille HD généré (24 mots):', 
-          { words: 24 }
-        );
-        console.log(logMessage, {
+        console.log('HD wallet generated (24 words):', {
           bech32: addresses.bech32,
           taproot: addresses.taproot,
           legacy: addresses.legacy,
@@ -660,19 +634,14 @@ function setupGenerationHandlers() {
     armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.MNEMONIC_PHRASE);
   });
-  
-  console.log('[UI] Generation handlers setup completed');
 }
 
 // === WALLET IMPORT HANDLERS ===
 function setupImportHandlers() {
-  console.log('[UI] Setting up import handlers...');
-  
   addUniqueEventListener(ELEMENT_IDS.IMPORT_WALLET_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
     
     if (isOperationActive('import')) {
-      console.log('[UI] Import already in progress');
       return;
     }
     
@@ -695,14 +664,11 @@ function setupImportHandlers() {
       const result = await window.importWallet(input);
       
       if (result.success) {
-        const logMessage = getTranslation('wallet.import_successful_calculating', 'Import réussi, calcul des soldes...');
-        console.log(logMessage);
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
         clearInputFields();
         
-        const successMessage = getTranslation('wallet.wallet_imported_successfully', 'Portefeuille importé avec succès:');
-        console.log(successMessage, result.importType);
+        console.log('Wallet imported successfully:', result.importType);
       } else {
         const errorMsg = getTranslation('errors.import_failed', `Échec de l'import: ${result.error}`);
         alert(errorMsg);
@@ -722,7 +688,6 @@ function setupImportHandlers() {
     armInactivityTimerSafely();
     
     if (isOperationActive('email-connect')) {
-      console.log('[UI] Email connection already in progress');
       return;
     }
     
@@ -743,15 +708,10 @@ function setupImportHandlers() {
         alert(errorMsg);
         return;
       }
-
-      const connectionMessage = getTranslation('wallet.email_connection_started', 'Connexion email démarrée, génération du portefeuille...');
-      console.log(connectionMessage);
       
       const result = await window.importWallet(email, password);
       
       if (result.success) {
-        const walletMessage = getTranslation('wallet.email_wallet_generated', 'Portefeuille email généré, calcul des soldes...');
-        console.log(walletMessage);
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
         clearInputFields();
@@ -760,11 +720,7 @@ function setupImportHandlers() {
           createSecureSeedButton(result.mnemonic, 'emailForm');
         }
         
-        const successMessage = getTranslation('wallet.email_wallet_connected', 
-          'Portefeuille email connecté avec succès (24 mots)',
-          { words: 24 }
-        );
-        console.log(successMessage);
+        console.log('Email wallet connected successfully (24 words)');
       } else {
         const errorMsg = getTranslation('errors.connection_failed', `Échec de la connexion: ${result.error}`);
         alert(errorMsg);
@@ -785,22 +741,17 @@ function setupImportHandlers() {
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
-      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
-await updateBalanceWithCacheClear();
+      await updateBalanceWithCacheClear();
     } catch (error) {
       console.error('[UI] Refresh balance error:', error);
     } finally {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, false);
     }
   });
-  
-  console.log('[UI] Import handlers setup completed');
 }
 
 // === AUTHENTICATION SYSTEM ===
 function setupAuthenticationSystem() {
-  console.log('[UI] Setting up authentication system...');
-  
   const tabEmail = document.getElementById('tabEmail');
   const tabKey = document.getElementById('tabKey');
   const emailForm = document.getElementById('emailForm');
@@ -835,114 +786,104 @@ function setupAuthenticationSystem() {
       tabKey.style.display = 'block';
     });
   }
-  
-  console.log('[UI] Authentication system setup completed');
 }
 
 // === TRANSACTION HANDLERS ===
 function setupTransactionHandlers() {
-  console.log('[UI] Setting up transaction handlers...');
-  
   const t = (window.i18next && typeof window.i18next.t === 'function') 
     ? window.i18next.t 
     : (key, fallback) => fallback || key;
     
-  
-addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
-  armInactivityTimerSafely();
-  try {
-    if (!window.isWalletReady || !window.isWalletReady()) {
-      const errorMsg = getTranslation('errors.import_first', "Importez d'abord un wallet");
-      alert(errorMsg);
-      return;
-    }
-
-    const selectedType = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE)?.value || 'bech32';
-
-    let sourceAddress;
-    if (selectedType === 'p2tr') {
-      sourceAddress = window.taprootAddress || '';
-    } else {
-      sourceAddress = window.bech32Address || '';
-    }
-    const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
-    if (!sourceAddress) {
-      console.warn('[UI] MAX: no source address for type', selectedType);
-      if (amtEl) amtEl.value = '0.00000000';
-      return;
-    }
-
-    const isHD = (typeof window.hdManager !== 'undefined' && !!window.hdManager.hdWallet);
-    const hdWallet = isHD ? window.hdManager.hdWallet : null;
-
-    if (typeof window.utxos !== 'function') {
-      console.warn('[UI] MAX: window.utxos is not a function');
-      if (amtEl) amtEl.value = '0.00000000';
-      return;
-    }
-
-    let allUtxos = await window.utxos(sourceAddress, isHD, hdWallet);
-    allUtxos = Array.isArray(allUtxos) ? allUtxos : [];
-
-    const allowed = selectedType === 'p2tr' ? ['p2tr'] : ['p2wpkh','p2pkh','p2sh'];
-    const spendables = allUtxos.filter(u => allowed.includes(u.scriptType));
-
-    if (!spendables.length) {
-      if (amtEl) amtEl.value = '0.00000000';
-      return;
-    }
-
-    const total = spendables.reduce((s, u) => s + (typeof u.amount === 'number' ? u.amount : parseFloat(u.amount) || 0), 0);
-
-    // ---- Fee estimation (local helper, no imports) ----
-    async function getRealFeeRate() {
-      try {
-        if (!window.rpc) return 0.00001;
-        const [feeInfo, mempoolInfo, networkInfo] = await Promise.allSettled([
-          window.rpc('estimatesmartfee', [6]),
-          window.rpc('getmempoolinfo', []),
-          window.rpc('getnetworkinfo', [])
-        ]);
-        const estimatedRate = (feeInfo.status === 'fulfilled' && feeInfo.value && feeInfo.value.feerate) ? feeInfo.value.feerate : 0.00001;
-        const mempoolMinFee = (mempoolInfo.status === 'fulfilled' && mempoolInfo.value && mempoolInfo.value.mempoolminfee) ? mempoolInfo.value.mempoolminfee : 0.00001;
-        const relayFee = (networkInfo.status === 'fulfilled' && networkInfo.value && networkInfo.value.relayfee) ? networkInfo.value.relayfee : 0.00001;
-        return Math.max(estimatedRate, mempoolMinFee, relayFee, 0.00001);
-      } catch (e) {
-        return 0.00001;
+  addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
+    armInactivityTimerSafely();
+    try {
+      if (!window.isWalletReady || !window.isWalletReady()) {
+        const errorMsg = getTranslation('errors.import_first', "Importez d'abord un wallet");
+        alert(errorMsg);
+        return;
       }
-    }
-    function estimateVBytes(inputType, numInputs, numOutputs = 2) {
-      const inputSizes = { p2pkh: 148, p2wpkh: 68, p2sh: 91, p2tr: 57.5 };
-      const outputSize = 31;
-      const overhead = 10;
-      const inputSize = inputSizes[inputType] || inputSizes.p2wpkh;
-      return overhead + (inputSize * numInputs) + (outputSize * numOutputs);
-    }
-    function calculateFeeForVsize(vbytes, feeRate) {
-      return Math.ceil(vbytes * (feeRate * 1e8) / 1000);
-    }
-    // ---------------------------------------------------
 
-    const feeRate = await getRealFeeRate();
-    const inputType = selectedType === 'p2tr' ? 'p2tr' : 'p2wpkh';
-    const vbytes = estimateVBytes(inputType, spendables.length, 2);
-    const feeSats = calculateFeeForVsize(vbytes, feeRate);
-    const feeNito = feeSats / 1e8;
+      const selectedType = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE)?.value || 'bech32';
 
-    const maxAmount = Math.max(0, total - feeNito);
-    if (amtEl) amtEl.value = maxAmount.toFixed(8);
-  } catch (error) {
-    console.error('[UI] MAX computation error:', error);
-    const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
-    if (amtEl) amtEl.value = '0.00000000';
-  }
-});
+      let sourceAddress;
+      if (selectedType === 'p2tr') {
+        sourceAddress = window.taprootAddress || '';
+      } else {
+        sourceAddress = window.bech32Address || '';
+      }
+      const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
+      if (!sourceAddress) {
+        if (amtEl) amtEl.value = '0.00000000';
+        return;
+      }
+
+      const isHD = (typeof window.hdManager !== 'undefined' && !!window.hdManager.hdWallet);
+      const hdWallet = isHD ? window.hdManager.hdWallet : null;
+
+      if (typeof window.utxos !== 'function') {
+        if (amtEl) amtEl.value = '0.00000000';
+        return;
+      }
+
+      let allUtxos = await window.utxos(sourceAddress, isHD, hdWallet);
+      allUtxos = Array.isArray(allUtxos) ? allUtxos : [];
+
+      const allowed = selectedType === 'p2tr' ? ['p2tr'] : ['p2wpkh','p2pkh','p2sh'];
+      const spendables = allUtxos.filter(u => allowed.includes(u.scriptType));
+
+      if (!spendables.length) {
+        if (amtEl) amtEl.value = '0.00000000';
+        return;
+      }
+
+      const total = spendables.reduce((s, u) => s + (typeof u.amount === 'number' ? u.amount : parseFloat(u.amount) || 0), 0);
+
+      async function getRealFeeRate() {
+        try {
+          if (!window.rpc) return 0.00001;
+          const [feeInfo, mempoolInfo, networkInfo] = await Promise.allSettled([
+            window.rpc('estimatesmartfee', [6]),
+            window.rpc('getmempoolinfo', []),
+            window.rpc('getnetworkinfo', [])
+          ]);
+          const estimatedRate = (feeInfo.status === 'fulfilled' && feeInfo.value && feeInfo.value.feerate) ? feeInfo.value.feerate : 0.00001;
+          const mempoolMinFee = (mempoolInfo.status === 'fulfilled' && mempoolInfo.value && mempoolInfo.value.mempoolminfee) ? mempoolInfo.value.mempoolminfee : 0.00001;
+          const relayFee = (networkInfo.status === 'fulfilled' && networkInfo.value && networkInfo.value.relayfee) ? networkInfo.value.relayfee : 0.00001;
+          return Math.max(estimatedRate, mempoolMinFee, relayFee, 0.00001);
+        } catch (e) {
+          return 0.00001;
+        }
+      }
+      function estimateVBytes(inputType, numInputs, numOutputs = 2) {
+        const inputSizes = { p2pkh: 148, p2wpkh: 68, p2sh: 91, p2tr: 57.5 };
+        const outputSize = 31;
+        const overhead = 10;
+        const inputSize = inputSizes[inputType] || inputSizes.p2wpkh;
+        return overhead + (inputSize * numInputs) + (outputSize * numOutputs);
+      }
+      function calculateFeeForVsize(vbytes, feeRate) {
+        return Math.ceil(vbytes * (feeRate * 1e8) / 1000);
+      }
+
+      const feeRate = await getRealFeeRate();
+      const inputType = selectedType === 'p2tr' ? 'p2tr' : 'p2wpkh';
+      const vbytes = estimateVBytes(inputType, spendables.length, 2);
+      const feeSats = calculateFeeForVsize(vbytes, feeRate);
+      const feeNito = feeSats / 1e8;
+
+      const maxAmount = Math.max(0, total - feeNito);
+      if (amtEl) amtEl.value = maxAmount.toFixed(8);
+    } catch (error) {
+      console.error('[UI] MAX computation error:', error);
+      const amtEl = document.getElementById(ELEMENT_IDS.AMOUNT_NITO);
+      if (amtEl) amtEl.value = '0.00000000';
+    }
+  });
 
   addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
     
     if (isOperationActive('transaction')) {
-      console.log('[UI] Transaction already in progress');
       return;
     }
     
@@ -985,7 +926,6 @@ addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'inline-block';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'inline-block';
       
-      console.log('[UI] Transaction prepared successfully');
     } catch (error) {
       const errorMsg = getTranslation('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
       alert(errorMsg);
@@ -1001,7 +941,6 @@ addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
     
     if (isOperationActive('broadcast')) {
-      console.log('[UI] Broadcast already in progress');
       return;
     }
     
@@ -1034,7 +973,6 @@ addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
       
       setTimeout(() => updateBalanceWithCacheClear(), 2000);
       
-      console.log('[UI] Transaction broadcast successfully:', txid);
     } catch (error) {
       const errorMsg = getTranslation('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
       alert(errorMsg);
@@ -1065,26 +1003,20 @@ addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
-      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
-await updateBalanceWithCacheClear();
-      } catch (error) {
+      await updateBalanceWithCacheClear();
+    } catch (error) {
       console.error('[UI] Send tab balance refresh error:', error);
     } finally {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, false);
     }
   });
-  
-  console.log('[UI] Transaction handlers setup completed');
 }
 
 // === MAIN SETUP FUNCTION ===
 export function setupUIHandlers() {
   if (setupComplete) {
-    console.log('[UI] Handlers already setup, skipping...');
     return true;
   }
-  
-  console.log('[UI] Setting up UI event handlers with enhanced deduplication...');
   
   try {
     setupGenerationHandlers();
@@ -1093,7 +1025,6 @@ export function setupUIHandlers() {
     setupTransactionHandlers();
     
     setupComplete = true;
-    console.log('[UI] All event handlers setup completed successfully');
     return true;
   } catch (error) {
     console.error('[UI] Handlers setup failed:', error);
@@ -1104,8 +1035,6 @@ export function setupUIHandlers() {
 
 // === CLEANUP FUNCTION ===
 export function cleanupUIHandlers() {
-  console.log('[UI] Cleaning up all event handlers...');
-  
   handlerRegistry.forEach((handler, key) => {
     const [elementId, eventType] = key.split(':');
     removeEventListener(elementId, eventType);
@@ -1113,8 +1042,6 @@ export function cleanupUIHandlers() {
   
   handlerRegistry.clear();
   setupComplete = false;
-  
-  console.log('[UI] All event handlers cleaned up');
 }
 
 // === AUTO-INITIALIZATION ===
@@ -1132,7 +1059,6 @@ function initializeWhenReady() {
 if (typeof window !== 'undefined') {
   if (window.i18next && typeof window.i18next.on === 'function') {
     window.i18next.on('languageChanged', () => {
-      console.log('[UI] Language changed, refreshing handlers...');
       setTimeout(() => {
         const buttons = document.querySelectorAll('button[data-i18n]');
         buttons.forEach(btn => {
@@ -1155,7 +1081,6 @@ initializeWhenReady();
 if (typeof window !== 'undefined') {
   window.setupUIHandlers = setupUIHandlers;
   window.cleanupUIHandlers = cleanupUIHandlers;
-  window.updateBalance = updateBalance;
   window.updateBalanceWithAnimation = updateBalanceWithAnimation;
   window.updateBalanceWithCacheClear = updateBalanceWithCacheClear;
   window.showConnectionLoadingSpinner = showConnectionLoadingSpinner;
