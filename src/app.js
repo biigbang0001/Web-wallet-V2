@@ -81,9 +81,8 @@ function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh')
   let modal = document.getElementById('balanceLoadingModal');
   
   if (show) {
-    const t = (window.i18next && typeof window.i18next.t === 'function') 
-      ? window.i18next.t 
-      : (key, fallback) => fallback || key;
+    const message = getTranslation(messageKey, 'Actualisation du solde…');
+    const subtitle = getTranslation('loading.blockchain_scan', 'Scan blockchain en cours...');
     
     if (!modal) {
       modal = document.createElement('div');
@@ -103,8 +102,6 @@ function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh')
     }
     
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    const message = t(messageKey, 'Actualisation du solde…');
-    const subtitle = t('loading.blockchain_scan', 'Scan blockchain en cours...');
     
     modal.innerHTML = `
       <div style="
@@ -149,6 +146,71 @@ function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh')
     if (modal) {
       modal.style.display = 'none';
     }
+  }
+}
+
+// === UNIFIED REFRESH SYSTEM ===
+async function refreshAllBalances() {
+  if (isOperationActive('full-refresh')) {
+    return;
+  }
+  
+  startOperation('full-refresh');
+  
+  showBalanceLoadingSpinner(true, 'loading.cache_clearing');
+  
+  try {
+    if (window.clearBlockchainCaches) {
+      const maybePromise = window.clearBlockchainCaches();
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        await maybePromise;
+      }
+    }
+    
+    await new Promise(r => setTimeout(r, 800));
+    showBalanceLoadingSpinner(true, 'loading.utxo_scan');
+    
+    if (typeof window.updateSendTabBalance === 'function') {
+      await window.updateSendTabBalance();
+    }
+    
+    if (window.getTotalBalance) {
+      const total = await window.getTotalBalance();
+      const balanceElement = document.getElementById('totalBalance');
+      if (balanceElement) {
+        const balanceText = getTranslation('import_section.balance', 'Solde:');
+        balanceElement.textContent = `${balanceText} ${total.toFixed(8)} NITO`;
+      }
+    }
+    
+    const sendTabBalance = document.getElementById('sendTabBalance');
+    if (sendTabBalance && window.balance) {
+      const selectedType = document.getElementById('debitAddressType')?.value || 'bech32';
+      let address = '';
+      if (selectedType === 'p2tr') {
+        address = window.taprootAddress || '';
+      } else {
+        address = window.bech32Address || '';
+      }
+      
+      if (address) {
+        const isHD = window.importType === 'hd';
+        const hdWallet = isHD && window.hdManager ? window.hdManager.hdWallet : null;
+        const balance = await window.balance(address, isHD, hdWallet);
+        sendTabBalance.textContent = (balance || 0).toFixed(8);
+      }
+    }
+    
+    showBalanceLoadingSpinner(true, 'loading.balance_updated');
+    await new Promise(r => setTimeout(r, 1200));
+    
+  } catch (error) {
+    console.error('Refresh error:', error);
+    showBalanceLoadingSpinner(true, 'loading.update_error');
+    await new Promise(r => setTimeout(r, 1500));
+  } finally {
+    showBalanceLoadingSpinner(false);
+    endOperation('full-refresh');
   }
 }
 
@@ -344,7 +406,7 @@ export class NITOWalletApp {
           return; 
         }
 
-        const savedLng = localStorage.getItem('nito_lang') || UI_CONFIG?.DEFAULT_LANGUAGE || 'fr';
+        const savedLng = localStorage.getItem('nito_lang') || UI_CONFIG?.DEFAULT_LANGUAGE || 'en';
 
         window.i18next
           .use(window.i18nextHttpBackend)
@@ -361,7 +423,7 @@ export class NITOWalletApp {
             initImmediate: false
           }, async (err) => {
             if (err) { 
-              if (savedLng !== 'fr') {
+              if (savedLng !== 'en') {
                 await this.retryI18nWithFallback();
               }
               resolve(); 
@@ -397,7 +459,6 @@ export class NITOWalletApp {
                 const selectedLang = e.target.value;
                 try {
                   localStorage.setItem('nito_lang', selectedLang);
-                  console.log('Language saved:', selectedLang);
                 } catch (error) {
                   console.warn('Failed to save language:', error);
                 }
@@ -415,8 +476,8 @@ export class NITOWalletApp {
 
   async retryI18nWithFallback() {
     try {
-      await window.i18next.changeLanguage('fr');
-      localStorage.setItem('nito_lang', 'fr');
+      await window.i18next.changeLanguage('en');
+      localStorage.setItem('nito_lang', 'en');
     } catch (error) {}
   }
 
@@ -529,6 +590,7 @@ export class NITOWalletApp {
     this.setupAuthenticationSystem();
     this.setupBalanceManagement();
     this.setupRefreshSystem();
+    this.setupAddressTypeChangeListener();
   }
 
   setupMobileZoomControl() {
@@ -617,7 +679,9 @@ export class NITOWalletApp {
         }
         
         if (window.balance) {
-          const balance = await window.balance(address);
+          const isHD = window.importType === 'hd';
+          const hdWallet = isHD && window.hdManager ? window.hdManager.hdWallet : null;
+          const balance = await window.balance(address, isHD, hdWallet);
           output.textContent = (balance || 0).toFixed(8);
         } else {
           output.textContent = '0.00000000';
@@ -631,70 +695,50 @@ export class NITOWalletApp {
 
     if (typeof window !== 'undefined') window.updateSendTabBalance = updateSendTabBalance;
 
-    document.addEventListener('change', (ev) => {
-      if (ev.target && ev.target.id === ELEMENT_IDS.DEBIT_ADDRESS_TYPE) {
-        setTimeout(() => updateSendTabBalance(), 200);
-      }
-    });
-
     const sendTabButton = document.querySelector('#mainTabs button[data-tab="tab-send"]');
     if (sendTabButton) sendTabButton.addEventListener('click', () => setTimeout(updateSendTabBalance, 100));
   }
 
   setupRefreshSystem() {
-    const refreshAllBalances = async () => {
-      if (isOperationActive('full-refresh')) {
-        return;
-      }
+    document.addEventListener('click', async (ev) => {
+      const btn = ev.target && ev.target.closest && ev.target.closest('button');
+      if (!btn) return;
       
-      startOperation('full-refresh');
+      const isMainRefresh = (btn.id === 'refreshBalanceButton');
+      const isSendRefresh = (btn.id === ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE);
       
-      const t = (window.i18next && typeof window.i18next.t === 'function') 
-        ? window.i18next.t 
-        : (key, fallback) => fallback || key;
+      if (!(isMainRefresh || isSendRefresh)) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
       
-      showBalanceLoadingSpinner(true, 'loading.cache_clearing');
+      const originalText = btn.textContent;
+      const originalDisabled = btn.disabled;
+      
+      btn.disabled = true;
+      btn.textContent = getTranslation('loading.refreshing', '⌛ Actualisation...');
+      btn.style.opacity = '0.7';
+      btn.style.cursor = 'not-allowed';
       
       try {
-        if (window.clearBlockchainCaches) {
-          const maybePromise = window.clearBlockchainCaches();
-          if (maybePromise && typeof maybePromise.then === 'function') {
-            await maybePromise;
-          }
-        }
-        
-        await new Promise(r => setTimeout(r, 800));
-        showBalanceLoadingSpinner(true, 'loading.utxo_scan');
-        
-        if (typeof window.updateBalanceWithLoadingPopup === 'function') {
-          await window.updateBalanceWithLoadingPopup();
-        }
-        
-        if (window.getTotalBalance) {
-          const total = await window.getTotalBalance();
-          const balanceElement = document.getElementById('totalBalance');
-          if (balanceElement) {
-            balanceElement.textContent = total.toFixed(8) + ' NITO';
-          }
-        }
-        
-        showBalanceLoadingSpinner(true, 'loading.balance_updated');
-        await new Promise(r => setTimeout(r, 1200));
-        
-      } catch (error) {
-        console.error('Refresh error:', error);
-        showBalanceLoadingSpinner(true, 'loading.update_error');
-        await new Promise(r => setTimeout(r, 1500));
+        await refreshAllBalances();
+      } catch (e) {
+        console.error('Refresh error:', e);
       } finally {
-        showBalanceLoadingSpinner(false);
-        endOperation('full-refresh');
+        btn.disabled = originalDisabled;
+        btn.textContent = originalText;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
       }
-    };
+    });
+  }
 
-    if (typeof window !== 'undefined') {
-      window.refreshAllBalances = refreshAllBalances;
-      window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
-    }
+  setupAddressTypeChangeListener() {
+    document.addEventListener('change', (ev) => {
+      if (ev.target && ev.target.id === ELEMENT_IDS.DEBIT_ADDRESS_TYPE) {
+        setTimeout(() => refreshAllBalances(), 200);
+      }
+    });
   }
 
   // === MODULE INITIALIZATION ===
@@ -726,7 +770,6 @@ export class NITOWalletApp {
     this.setupPeriodicTasks();
     this.registerServiceWorker();
     this.setupRefreshLabels();
-    this.setupGlobalRefreshHandlers();
   }
 
   async updateCounterDisplay() {
@@ -759,9 +802,7 @@ export class NITOWalletApp {
   setupRefreshLabels() {
     const setRefreshLabels = () => {
       try {
-        const t = (window.i18next && typeof window.i18next.t === 'function')
-          ? window.i18next.t('import_section.refresh_button', '🔄 Actualiser')
-          : '🔄 Actualiser';
+        const t = getTranslation('import_section.refresh_button', '🔄 Actualiser');
         
         const mainBtn = document.getElementById('refreshBalanceButton');
         if (mainBtn) {
@@ -811,50 +852,7 @@ export class NITOWalletApp {
       window.i18next.on('languageChanged', setRefreshLabels);
     }
     
-    if (typeof window !== 'undefined') {
-      window.setRefreshLabels = setRefreshLabels;
-    }
-
     setTimeout(setRefreshLabels, 100);
-  }
-
-  setupGlobalRefreshHandlers() {
-    document.addEventListener('click', async (ev) => {
-      const btn = ev.target && ev.target.closest && ev.target.closest('button');
-      if (!btn) return;
-      
-      const isMainRefresh = (btn.id === 'refreshBalanceButton');
-      const isSendRefresh = (btn.id === ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE);
-      
-      if (!(isMainRefresh || isSendRefresh)) return;
-
-      ev.preventDefault();
-      ev.stopPropagation();
-      
-      const t = (window.i18next && typeof window.i18next.t === 'function') 
-        ? window.i18next.t 
-        : (key, fallback) => fallback || key;
-      
-      const originalText = btn.textContent;
-      const originalDisabled = btn.disabled;
-      
-      btn.disabled = true;
-      btn.textContent = t('loading.refreshing', '⌛ Actualisation...');
-      btn.style.opacity = '0.7';
-      btn.style.cursor = 'not-allowed';
-      
-      try {
-        if (typeof window.refreshAllBalances === 'function') {
-          await window.refreshAllBalances();
-        }
-      } catch (e) {
-        console.error('Refresh error:', e);
-      } finally {
-        btn.disabled = originalDisabled;
-        btn.textContent = originalText;
-        btn.style.cssText = originalText;
-      }
-    });
   }
 
   // === COMPLETION ===
@@ -978,8 +976,11 @@ if (document.readyState === 'loading') {
 if (typeof window !== 'undefined') {
   window.NITOWalletApp = NITOWalletApp;
   window.initializeApp = initializeApp;
+  window.getTranslation = getTranslation;
   window.showLoading = showLoading;
   window.hideLoading = hideLoading;
+  window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
+  window.refreshAllBalances = refreshAllBalances;
   window.startOperation = startOperation;
   window.endOperation = endOperation;
   window.isOperationActive = isOperationActive;
