@@ -1,8 +1,5 @@
 # Web-wallet-V2
 
-___
-
-
 <p align="center">
-  <img src="assets/gear.svg" width="80" />
+  <img src="assets/gear.svg" width="260" alt="Deux engrenages imbriqués animés" />
 </p>
