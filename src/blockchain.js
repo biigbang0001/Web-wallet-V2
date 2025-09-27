@@ -21,15 +21,11 @@ async function sleepJitter(baseMs = 1, maxJitterMs = 300, active = false) {
 
 // === ENHANCED ERROR HANDLING ===
 async function handleError500(method, params, attempt, maxRetries, error) {
-  console.warn(`[RPC] 500 Error on ${method} (attempt ${attempt}/${maxRetries}):`, error.message);
-  
   if (attempt < maxRetries) {
-    console.log(`[RPC] Waiting ${NODE_CONFIG.ERROR_500_DELAY}ms before retry...`);
     await sleep(NODE_CONFIG.ERROR_500_DELAY);
-    return true; // Continue retrying
+    return true;
   }
-  
-  return false; // Stop retrying
+  return false;
 }
 
 // === SECURE RPC CLIENT ===
@@ -69,7 +65,6 @@ export class SecureRPCClient {
           timestamp: Date.now()
         });
         
-        // Cleanup cache if too large
         if (this.cache.size > 100) {
           const oldEntries = Array.from(this.cache.entries())
             .sort((a, b) => a[1].timestamp - b[1].timestamp)
@@ -80,7 +75,6 @@ export class SecureRPCClient {
       
       return result;
     } catch (error) {
-      // Don't cache errors
       throw error;
     } finally {
       this.requestQueue.delete(cacheKey);
@@ -117,7 +111,6 @@ export class SecureRPCClient {
 
         clearTimeout(timeoutId);
 
-        // Handle specific HTTP status codes
         if (response.status === 503) {
           if (NODE_CONFIG.NO_503_BACKOFF_METHODS.has(method)) {
             continue;
@@ -128,7 +121,6 @@ export class SecureRPCClient {
 
         const text = await response.text();
 
-        // Enhanced 500 error handling
         if (response.status === 500) {
           const shouldRetry = await handleError500(method, params, attempt, maxRetries, new Error(text));
           if (shouldRetry) {
@@ -143,10 +135,6 @@ export class SecureRPCClient {
           continue;
         }
 
-        if (this.debug && !['getnetworkinfo', 'estimatesmartfee'].includes(method)) {
-          console.log('RPC response:', text.substring(0, 200) + (text.length > 200 ? '...' : ''));
-        }
-
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${text}`);
         }
@@ -159,9 +147,8 @@ export class SecureRPCClient {
         }
 
         if (data.error) {
-          // Special handling for some expected errors
           if (data.error.code === -8 && method === 'gettxout') {
-            return null; // UTXO not found is expected
+            return null;
           }
           throw new Error(`RPC Error: ${data.error.message} (Code: ${data.error.code})`);
         }
@@ -175,7 +162,6 @@ export class SecureRPCClient {
       } catch (error) {
         const msg = String(error.message || error);
         
-        // Handle specific error cases
         if (msg.includes('503') || msg.includes('Scan already in progress') || msg.includes('code":-8')) {
           if (msg.includes('503') && NODE_CONFIG.NO_503_BACKOFF_METHODS.has(method)) {
             continue;
@@ -184,9 +170,7 @@ export class SecureRPCClient {
           continue;
         }
 
-        // Handle network timeouts
         if (msg.includes('aborted') || msg.includes('timeout')) {
-          console.warn(`Network timeout for ${method}, attempt ${attempt}/${maxRetries}`);
           await sleep(NODE_CONFIG.RETRY_DELAY * attempt);
           if (attempt < maxRetries) continue;
         }
@@ -223,7 +207,7 @@ export class SecureRPCClient {
       'getblockchaininfo': 30000,
       'getnetworkinfo': 60000,
       'getmempoolinfo': 15000,
-      'getrawtransaction': 300000 // 5 minutes for tx data
+      'getrawtransaction': 300000
     };
     return durations[method] || 5000;
   }
@@ -260,24 +244,20 @@ export class AddressManager {
 
       const script = Buffer.from(scriptPubKey, 'hex');
       
-      // P2PKH: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
       if (script.length === 25 && 
           script[0] === 0x76 && script[1] === 0xa9 && script[2] === 0x14 && 
           script[23] === 0x88 && script[24] === 0xac) {
         return 'p2pkh';
       }
       
-      // P2WPKH: OP_0 <20 bytes>
       if (script.length === 22 && script[0] === 0x00 && script[1] === 0x14) {
         return 'p2wpkh';
       }
       
-      // P2SH: OP_HASH160 <20 bytes> OP_EQUAL
       if (script.length === 23 && script[0] === 0xa9 && script[1] === 0x14 && script[22] === 0x87) {
         return 'p2sh';
       }
       
-      // P2TR: OP_1 <32 bytes>
       if (script.length === 34 && script[0] === 0x51 && script[1] === 0x20) {
         return 'p2tr';
       }
@@ -372,7 +352,6 @@ export class HDUTXOScanner {
       
       return this.enrichUTXOs(scan.unspents, hdWallet, addressFamily);
     } catch (error) {
-      console.warn(`Descriptor scan failed for ${addressFamily}, falling back to legacy scan:`, error);
       return this.scanHDUTXOsLegacy(hdWallet, addressFamily);
     }
   }
@@ -483,7 +462,6 @@ export class HDUTXOScanner {
           const node = branch.derive(i);
           
           if (!window.bitcoin || !window.ECPair) {
-            console.warn('Bitcoin libraries not available for address derivation');
             continue;
           }
 
@@ -540,9 +518,7 @@ export class HDUTXOScanner {
     
     for (const family of families) {
       try {
-        console.log(`[UTXO_SCAN] Scanning ${family} family...`);
         const familyUtxos = await this.scanHDUTXOsWithDescriptors(hdWallet, family);
-        console.log(`[UTXO_SCAN] Found ${familyUtxos.length} UTXOs in ${family} family`);
         
         for (const utxo of familyUtxos) {
           const key = `${utxo.txid}:${utxo.vout}`;
@@ -552,19 +528,16 @@ export class HDUTXOScanner {
           }
         }
       } catch (error) {
-        console.warn(`Failed to scan ${family} UTXOs:`, error);
+        console.error(`Failed to scan ${family} UTXOs:`, error);
       }
     }
     
-    console.log(`[UTXO_SCAN] Total unique UTXOs found: ${allUtxos.length}`);
     return allUtxos;
   }
 
   async scanSpecificFamily(hdWallet, family) {
     try {
-      console.log(`[UTXO_SCAN] Scanning specific family: ${family}`);
       const familyUtxos = await this.scanHDUTXOsWithDescriptors(hdWallet, family);
-      console.log(`[UTXO_SCAN] Found ${familyUtxos.length} UTXOs in ${family} family`);
       return familyUtxos;
     } catch (error) {
       console.error(`Failed to scan ${family} UTXOs:`, error);
@@ -579,7 +552,7 @@ export async function utxos(address, isHD = false, hdWallet = null) {
     const cacheKey = `utxos:${address}:${isHD}`;
     if (UTXO_CACHE.has(cacheKey)) {
       const cached = UTXO_CACHE.get(cacheKey);
-      if (Date.now() - cached.timestamp < 30000) { // 30 second cache
+      if (Date.now() - cached.timestamp < 30000) {
         return cached.data;
       }
       UTXO_CACHE.delete(cacheKey);
@@ -591,25 +564,16 @@ export async function utxos(address, isHD = false, hdWallet = null) {
       const scanner = new HDUTXOScanner(rpcClient);
       const addressType = AddressManager.getAddressType(address);
       
-      console.log(`[UTXO] HD scan for address type: ${addressType}`);
-      
-      // Special behavior: bech32 cumulates all three types (legacy + p2sh + bech32)
       if (addressType === 'p2wpkh') {
-        console.log('[UTXO] Scanning cumulative UTXOs for bech32 (legacy + p2sh + bech32)');
         const allUtxos = await scanner.scanAllFamilies(hdWallet);
-        // Filter out taproot UTXOs for bech32 cumulative behavior
         const cumulativeUtxos = allUtxos.filter(utxo => 
           ['p2wpkh', 'p2pkh', 'p2sh'].includes(utxo.scriptType)
         );
-        console.log(`[UTXO] Cumulative UTXOs found: ${cumulativeUtxos.length}`);
         result = await filterMatureUtxos(cumulativeUtxos);
       } else if (addressType === 'p2tr') {
-        // Individual scan for taproot
-        console.log('[UTXO] Scanning taproot UTXOs only');
         const taprootUtxos = await scanner.scanSpecificFamily(hdWallet, 'taproot');
         result = await filterMatureUtxos(taprootUtxos);
       } else {
-        // Individual scan for other address types
         let familyMap = {
           'p2sh': 'p2sh',
           'p2pkh': 'legacy'
@@ -617,17 +581,13 @@ export async function utxos(address, isHD = false, hdWallet = null) {
         
         const family = familyMap[addressType];
         if (family) {
-          console.log(`[UTXO] Scanning ${family} UTXOs only`);
           const hdUtxos = await scanner.scanSpecificFamily(hdWallet, family);
           result = await filterMatureUtxos(hdUtxos);
         } else {
-          console.warn(`[UTXO] Unknown address type: ${addressType}`);
           result = [];
         }
       }
     } else {
-      console.log(`[UTXO] Single address scan for: ${address}`);
-      // Single address scan fallback
       const scan = await rpcClient.call('scantxoutset', ['start', [`addr(${address})`]]);
       if (!scan || !scan.success || !scan.unspents) {
         result = [];
@@ -638,9 +598,6 @@ export async function utxos(address, isHD = false, hdWallet = null) {
           }
           
           const scriptType = AddressManager.detectScriptType(utxo.scriptPubKey);
-          if (scriptType === 'unknown') {
-            console.warn(`Unknown script type for UTXO ${utxo.txid}:${utxo.vout}`);
-          }
           
           return {
             txid: utxo.txid,
@@ -655,9 +612,6 @@ export async function utxos(address, isHD = false, hdWallet = null) {
       }
     }
 
-    console.log(`[UTXO] Final mature UTXOs: ${result.length}`);
-
-    // Cache result
     UTXO_CACHE.set(cacheKey, {
       data: result,
       timestamp: Date.now()
@@ -686,15 +640,10 @@ export async function balance(address, isHD = false, hdWallet = null) {
 
     let result;
 
-    console.log(`[BALANCE] Calculating for address: ${address}, HD: ${isHD}`);
-
     if (isHD && hdWallet) {
       const addressType = AddressManager.getAddressType(address);
-      console.log(`[BALANCE] HD address type: ${addressType}`);
       
-      // Special behavior: bech32 cumulates balance from all three types
       if (addressType === 'p2wpkh') {
-        console.log('[BALANCE] Calculating cumulative balance for bech32 (legacy + p2sh + bech32)');
         const utxoList = await utxos(address, true, hdWallet);
         result = utxoList.reduce((sum, utxo) => sum + (utxo.amount || 0), 0);
       } else {
@@ -706,9 +655,6 @@ export async function balance(address, isHD = false, hdWallet = null) {
       result = (scan && scan.total_amount) || 0;
     }
 
-    console.log(`[BALANCE] Final balance: ${result} NITO`);
-
-    // Cache result
     BALANCE_CACHE.set(cacheKey, {
       data: result,
       timestamp: Date.now()
@@ -743,7 +689,6 @@ export async function fetchRawTxHex(txid) {
     
     RAW_TX_CACHE.set(txid, hex);
     
-    // Limit cache size
     if (RAW_TX_CACHE.size > 100) {
       const keys = Array.from(RAW_TX_CACHE.keys());
       for (let i = 0; i < 20; i++) {
@@ -768,7 +713,6 @@ export async function filterOpReturnUtxos(utxos) {
     utxo.amount >= TRANSACTION_CONFIG.MIN_CONSOLIDATION_FEE
   );
   
-  console.log(`[FILTER] UTXOs filtered: ${filteredUtxos.length}/${utxos.length} (>= ${TRANSACTION_CONFIG.MIN_CONSOLIDATION_FEE} NITO)`);
   return filteredUtxos;
 }
 
@@ -780,17 +724,6 @@ export function clearBlockchainCaches() {
   UTXO_CACHE.clear();
   BALANCE_CACHE.clear();
   rpcClient.clearCache();
-  
-  console.log(`[CACHE] Blockchain caches cleared (${sizeBefore} entries removed)`);
-  
-  // CORRECTION: Ne plus émettre d'événement SYSTEM_ERROR qui déclenche le nettoyage des clés de sécurité
-  // Les caches blockchain peuvent être nettoyés sans déclencher les mécanismes de sécurité
-  
-  // Optionnel: émettre un événement spécifique pour le nettoyage de cache si nécessaire pour le monitoring
-  // eventBus.emit(EVENTS.BLOCKCHAIN_CACHE_CLEARED, {
-  //   timestamp: Date.now(),
-  //   entriesCleared: sizeBefore
-  // });
 }
 
 // === GLOBAL RPC CLIENT INSTANCE ===
