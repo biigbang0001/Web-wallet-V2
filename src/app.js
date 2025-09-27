@@ -52,7 +52,7 @@ function showLoading(message) {
           backdrop-filter: blur(10px);
         ">
           <div style="font-size:2.5rem; line-height:1; margin-bottom:1rem; animation: rotate 1.2s linear infinite;">⌛</div>
-          <div class="loading-text" style="font-weight:600; font-size: 18px; margin-bottom: 0.5rem;">Actualisation du solde…</div>
+          <div class="loading-text" style="font-weight:600; font-size: 18px; margin-bottom: 0.5rem;">${message || 'Chargement...'}</div>
           <div style="font-size: 14px; opacity: 0.7;">Scan blockchain en cours...</div>
         </div>
       `;
@@ -397,7 +397,7 @@ export class NITOWalletApp {
     setupAutoReloadOnKeyClear();
   }
 
-  // === INTERNATIONALIZATION ===
+  // === INTERNATIONALIZATION CORRIGÉE ===
   async initializeI18nRobust() {
     return new Promise((resolve) => {
       try {
@@ -430,24 +430,19 @@ export class NITOWalletApp {
               return; 
             }
 
-            // CORRECTION PRINCIPALE : Différer la mise à jour du sélecteur
-            setTimeout(() => {
-              const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-              if (sel) {
-                sel.value = window.i18next.language || savedLng;
-              }
-            }, 100);
-
+            // Appliquer les traductions immédiatement
             await this.applyTranslationsWithRetry();
 
+            // Configuration du gestionnaire de changement de langue
             const changeLanguage = async (lng) => {
               try {
                 localStorage.setItem('nito_lang', lng);
                 await window.i18next.changeLanguage(lng);
                 await this.applyTranslationsWithRetry();
-    
+                
+                // Synchroniser le sélecteur après le changement de langue
                 const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-                if (selector) {
+                if (selector && selector.value !== lng) {
                   selector.value = lng;
                 }
               } catch (error) {
@@ -455,21 +450,8 @@ export class NITOWalletApp {
               }
             };
 
-            // Mettre à jour également le sélecteur dans le gestionnaire d'événements
-            const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-            if (sel) {
-              const newSel = sel.cloneNode(true);
-              sel.parentNode.replaceChild(newSel, sel);  
-              newSel.addEventListener('change', (e) => {
-                const selectedLang = e.target.value;
-                try {
-                  localStorage.setItem('nito_lang', selectedLang);
-                } catch (error) {
-                  console.warn('Failed to save language:', error);
-                }
-                changeLanguage(selectedLang);
-              });
-            }
+            // Configurer le sélecteur de langue UNE SEULE FOIS
+            this.setupLanguageSelector(changeLanguage, savedLng);
 
             resolve();
           });
@@ -477,6 +459,37 @@ export class NITOWalletApp {
         resolve();
       }
     });
+  }
+
+  setupLanguageSelector(changeLanguage, initialLang) {
+    const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
+    if (!selector) {
+      console.warn('Language selector not found');
+      return;
+    }
+
+    // S'assurer que la valeur initiale est correcte
+    selector.value = initialLang;
+    
+    // Nettoyer les anciens listeners pour éviter les doublons
+    const newSelector = selector.cloneNode(true);
+    selector.parentNode.replaceChild(newSelector, selector);
+    
+    // Ajouter le nouvel event listener
+    newSelector.addEventListener('change', (e) => {
+      const selectedLang = e.target.value;
+      if (selectedLang !== window.i18next.language) {
+        changeLanguage(selectedLang);
+      }
+    });
+
+    // Vérifier la synchronisation après un délai pour s'assurer que tout est chargé
+    setTimeout(() => {
+      const currentLang = window.i18next.language || initialLang;
+      if (newSelector.value !== currentLang) {
+        newSelector.value = currentLang;
+      }
+    }, 500);
   }
 
   async retryI18nWithFallback() {
@@ -541,10 +554,13 @@ export class NITOWalletApp {
       }
     }
     
-    // S'assurer que le sélecteur est synchronisé après les traductions
+    // S'assurer que le sélecteur reflète la langue actuelle
     const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
     if (selector && window.i18next) {
-      selector.value = window.i18next.language;
+      const currentLang = window.i18next.language;
+      if (selector.value !== currentLang) {
+        selector.value = currentLang;
+      }
     }
   }
 
