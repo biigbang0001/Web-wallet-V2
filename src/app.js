@@ -406,13 +406,18 @@ export class NITOWalletApp {
           return; 
         }
 
-        const savedLng = localStorage.getItem('nito_lang') || UI_CONFIG?.DEFAULT_LANGUAGE || 'en';
+        // LIRE D'ABORD LE SÉLECTEUR, puis localStorage, puis 'en'
+        const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
+        const selectorValue = selector?.value;
+        const storedValue = localStorage.getItem('nito_lang');
+        
+        const savedLng = selectorValue || storedValue || 'en';
 
         window.i18next
           .use(window.i18nextHttpBackend)
           .init({
             lng: savedLng,
-            fallbackLng: UI_CONFIG?.FALLBACK_LANGUAGE || 'en',
+            fallbackLng: 'en',
             backend: {
               loadPath: './locales/{{lng}}.json'
             },
