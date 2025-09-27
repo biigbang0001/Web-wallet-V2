@@ -799,4 +799,4 @@ if (typeof window !== 'undefined') {
   window.effectiveFeeRate = effectiveFeeRate;
 }
 
-console.log('transactions module loaded - Version 2.0.0');
+console.log('Transactions module loaded - Version 2.0.0');
