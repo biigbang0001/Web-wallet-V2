@@ -1018,6 +1018,8 @@ export async function importWallet(arg1, arg2) {
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType: 'email' });
       
+      console.log('Email wallet connected successfully (24 words)');
+      
       return { 
         success: true, 
         importType: 'email', 
@@ -1112,6 +1114,8 @@ export async function importWallet(arg1, arg2) {
       
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType });
+      
+      console.log('Wallet imported successfully:', importType);
                         
       return { 
         success: true, 
@@ -1271,6 +1275,217 @@ export function updateInactivityTimer() {
   walletState.timerInterval = setInterval(updateTimer, 1000);
 }
 
+// === WALLET DISPLAY FUNCTIONS ===
+function hideAllAuthForms() {
+  const emailForm = document.getElementById('emailForm');
+  const keyForm = document.getElementById('keyForm');
+  const tabEmail = document.getElementById('tabEmail');
+  const tabKey = document.getElementById('tabKey');
+  
+  if (emailForm) emailForm.style.display = 'none';
+  if (keyForm) keyForm.style.display = 'none';
+  if (tabEmail) tabEmail.style.display = 'none';
+  if (tabKey) tabKey.style.display = 'none';
+}
+
+function clearInputFields() {
+  const privateKeyField = document.getElementById(ELEMENT_IDS.PRIVATE_KEY_WIF);
+  const emailField = document.getElementById(ELEMENT_IDS.EMAIL_INPUT);
+  const passwordField = document.getElementById(ELEMENT_IDS.PASSWORD_INPUT);
+  
+  if (privateKeyField) {
+    privateKeyField.value = '';
+    privateKeyField.style.filter = 'blur(4px)';
+  }
+  if (emailField) emailField.value = '';
+  if (passwordField) passwordField.value = '';
+}
+
+function displayWalletInfo(addresses, importType) {
+  armInactivityTimerSafely();
+  
+  const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
+  const bech32Element = document.getElementById(ELEMENT_IDS.BECH32_ADDRESS);
+  const taprootElement = document.getElementById(ELEMENT_IDS.TAPROOT_ADDRESS);
+  const addressesSection = document.getElementById('nito-addresses');
+  
+  if (walletAddressElement && addresses) {
+    const balanceText = getTranslation('import_section.balance', 'Solde:');
+    
+    walletAddressElement.innerHTML = `
+      <div style="margin-top: 10px;">
+        <strong>Bech32:</strong> ${addresses.bech32}<br>
+        <strong>Taproot:</strong> ${addresses.taproot}
+      </div>
+      <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
+        ${balanceText} 0.00000000 NITO
+      </div>
+    `;
+    
+    if (addressesSection) {
+      addressesSection.style.display = 'block';
+      if (bech32Element) bech32Element.value = addresses.bech32 || '';
+      if (taprootElement) taprootElement.value = addresses.taproot || '';
+    }
+  }
+  
+  if (FEATURE_FLAGS.LOG_ADDRESSES) {
+    console.log('=== WALLET ADDRESSES ===');
+    console.log('Bech32:', addresses.bech32);
+    console.log('Bech32m (Taproot):', addresses.taproot);
+    console.log('Legacy:', addresses.legacy);
+    console.log('P2SH:', addresses.p2sh);
+    console.log('========================');
+  }
+  
+  injectConsolidateButton();
+}
+
+function injectConsolidateButton() {
+  const consolidateContainer = document.querySelector('.consolidate-container');
+  if (consolidateContainer && !consolidateContainer.querySelector('#consolidateButton')) {
+    const t = (window.i18next && typeof window.i18next.t === 'function') 
+      ? window.i18next.t 
+      : (key, fallback) => fallback || key;
+      
+    const consolidateButton = document.createElement('button');
+    consolidateButton.id = 'consolidateButton';
+    consolidateButton.className = 'consolidate-button';
+    consolidateButton.type = 'button';
+    consolidateButton.setAttribute('data-i18n','consolidate.cta'); 
+    consolidateButton.textContent = t('consolidate.cta', 'Consolider les UTXOs');
+    consolidateButton.style.display = 'inline-block';
+    consolidateButton.style.marginTop = '10px';
+    
+    consolidateButton.addEventListener('click', async () => {
+      armInactivityTimerSafely();
+      
+      if (isOperationActive('consolidation')) {
+        return;
+      }
+      
+      if (window.consolidateUtxos) {
+        await window.consolidateUtxos();
+      } else {
+        const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
+        alert(errorMsg);
+      }
+    });
+    
+    consolidateContainer.appendChild(consolidateButton);
+  }
+}
+
+// === SECURE SEED COPY SYSTEM ===
+function createSecureSeedButton(mnemonic, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const t = (window.i18next && typeof window.i18next.t === 'function') 
+    ? window.i18next.t 
+    : (key, fallback) => fallback || key;
+
+  const existingSeedButton = document.getElementById(ELEMENT_IDS.EMAIL_SEED_BUTTON);
+  if (existingSeedButton) {
+    existingSeedButton.remove();
+  }
+
+  const seedButton = document.createElement('button');
+  seedButton.id = ELEMENT_IDS.EMAIL_SEED_BUTTON;
+  seedButton.className = 'reveal-btn';
+  seedButton.textContent = t('seed_reveal.button_reveal', '🔒 Révéler la phrase mnémotechnique');
+  seedButton.style.marginTop = '10px';
+  seedButton.style.display = 'block';
+
+  let isRevealed = false;
+  let revealTimeout = null;
+
+  seedButton.addEventListener('click', () => {
+    armInactivityTimerSafely();
+    
+    if (!isRevealed) {
+      const seedDisplay = document.createElement('div');
+      seedDisplay.id = 'tempSeedDisplay';
+      seedDisplay.style.cssText = `
+        margin: 10px 0; 
+        padding: 15px; 
+        background: rgba(var(--glass-bg), 0.1); 
+        border: 1px solid var(--glass-border); 
+        border-radius: 12px; 
+        font-family: monospace; 
+        word-break: break-all; 
+        border-left: 4px solid #4caf50;
+        position: relative;
+      `;
+      
+      const warningText = t('seed_reveal.warning_title', '⚠️ Phrase mnémotechnique (24 mots) :');
+      const copyButtonText = t('seed_reveal.copy_button', '📋 Copier');
+      const timeoutWarning = t('seed_reveal.timeout_warning', 'Cette phrase sera automatiquement masquée dans 30 secondes');
+      
+      seedDisplay.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 8px;">${warningText}</div>
+        <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-bottom: 8px;">${mnemonic}</div>
+        <button id="copySeedBtn" class="copy-btn" style="margin-right: 8px;">${copyButtonText}</button>
+        <small style="color: var(--text-secondary); font-size: 0.85em;">
+          ${timeoutWarning}
+        </small>
+      `;
+
+      container.appendChild(seedDisplay);
+
+      document.getElementById('copySeedBtn').addEventListener('click', () => {
+        armInactivityTimerSafely();
+        
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(mnemonic).then(() => {
+            const successMsg = t('seed_reveal.copy_success', 'Phrase mnémotechnique copiée dans le presse-papiers !');
+            alert(successMsg);
+          }).catch(() => {
+            const textArea = document.createElement('textarea');
+            textArea.value = mnemonic;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            const fallbackMsg = t('seed_reveal.copy_fallback', 'Phrase mnémotechnique copiée !');
+            alert(fallbackMsg);
+          });
+        }
+      });
+
+      seedButton.textContent = t('seed_reveal.button_hide', '🔒 Masquer la phrase');
+      isRevealed = true;
+
+      revealTimeout = setTimeout(() => {
+        hideSeed();
+      }, 30000);
+
+    } else {
+      hideSeed();
+    }
+  });
+
+  function hideSeed() {
+    const seedDisplay = document.getElementById('tempSeedDisplay');
+    if (seedDisplay) {
+      seedDisplay.remove();
+    }
+    seedButton.textContent = t('seed_reveal.button_reveal', '🔒 Révéler la phrase mnémotechnique');
+    isRevealed = false;
+    
+    if (revealTimeout) {
+      clearTimeout(revealTimeout);
+      revealTimeout = null;
+    }
+  }
+
+  container.appendChild(seedButton);
+  return seedButton;
+}
+
 // === GLOBAL STATE SYNC ===
 export function syncGlobalState() {
   if (typeof window !== 'undefined') {
@@ -1319,6 +1534,10 @@ if (typeof window !== 'undefined') {
   window.utxos = utxos;
   window.balance = balance;
   window.showSuccessPopup = showSuccessPopup;
+  window.displayWalletInfo = displayWalletInfo;
+  window.hideAllAuthForms = hideAllAuthForms;
+  window.clearInputFields = clearInputFields;
+  window.createSecureSeedButton = createSecureSeedButton;
   
   window.walletAddress = '';
   window.legacyAddress = '';
