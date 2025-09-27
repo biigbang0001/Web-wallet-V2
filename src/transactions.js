@@ -6,6 +6,24 @@ import { armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
+// === POLYFILL: Uint8Array.equals for bitcoinjs-lib interop ===
+if (typeof Uint8Array !== 'undefined' && !Uint8Array.prototype.equals) {
+  // Non-invasive, constant-time-ish equality check sufficient for structural compare
+  Object.defineProperty(Uint8Array.prototype, 'equals', {
+    value: function(other) {
+      if (!other || typeof other.length !== 'number') return false;
+      if (other.length !== this.length) return false;
+      let diff = 0;
+      for (let i = 0; i < this.length; i++) { diff |= (this[i] ^ other[i]); }
+      return diff === 0;
+    },
+    writable: false,
+    configurable: true,
+    enumerable: false
+  });
+}
+
+
 // === TRANSLATION HELPER ===
 function getTranslation(key, fallback, params = {}) {
   const t = (window.i18next && typeof window.i18next.t === 'function') 
@@ -134,6 +152,7 @@ export class FeeManager {
 }
 
 // Enhanced Taproot utilities with proper key management
+// === TAPROOT UTILITIES ===
 export class TaprootUtils {
   static toXOnly(pubkey) {
     if (!pubkey || pubkey.length < 33) {
@@ -142,104 +161,91 @@ export class TaprootUtils {
     return Buffer.from(pubkey.slice(1, 33));
   }
 
-  static async tweakSigner(signer, opts = {}) {
-    const { bitcoin } = await getBitcoinLibraries();
-    
-    if (!bitcoin.crypto) {
-      throw new Error('Bitcoin crypto functions not available');
+  static tapTweakHash(pubKey, h = Buffer.alloc(0)) {
+    if (!window.bitcoin || !window.bitcoin.crypto) {
+      throw new Error('Bitcoin library not available for tapTweakHash');
+    }
+    return window.bitcoin.crypto.taggedHash(
+      'TapTweak',
+      Buffer.concat([TaprootUtils.toXOnly(pubKey), h])
+    );
+  }
+
+  static tweakSigner(signer, opts = {}) {
+    if (!window.ecc || typeof window.ecc.privateAdd !== 'function') {
+      throw new Error('ECC library not available for tweakSigner');
     }
 
-    console.log('[TAPROOT] Tweaking signer for taproot transaction');
+    let d = Uint8Array.from(signer.privateKey);
+    const P = Uint8Array.from(signer.publicKey);
 
-    let privateKey = Buffer.from(signer.privateKey);
-    const publicKey = Buffer.from(signer.publicKey);
-    
-    // Check if we need to negate the private key
-    if (publicKey[0] === 3) {
-      console.log('[TAPROOT] Negating private key for odd y-coordinate');
-      privateKey = bitcoin.crypto.privateNegate(privateKey);
+    // If odd y (0x03), negate private key
+    if (P[0] === 3) {
+      d = window.ecc.privateNegate(d);
     }
-    
+
     const tweakHash = opts.tweakHash ? Buffer.from(opts.tweakHash) : Buffer.alloc(0);
-    const tapTweakHash = bitcoin.crypto.taggedHash('TapTweak', Buffer.concat([TaprootUtils.toXOnly(publicKey), tweakHash]));
-    const tweak = Buffer.from(tapTweakHash);
-    const tweakedPrivateKey = bitcoin.crypto.privateAdd(privateKey, tweak);
-    
-    if (!tweakedPrivateKey) {
-      const errorMsg = getTranslation('security.invalid_tweaked_key', 'Clé privée modifiée invalide');
-      throw new Error(errorMsg);
+    const tweak = Uint8Array.from(TaprootUtils.tapTweakHash(signer.publicKey, tweakHash));
+
+    const dTweak = window.ecc.privateAdd(d, tweak);
+    if (!dTweak) {
+      throw new Error('Invalid tweaked private key');
     }
-    
-    const tweakedPublicKey = bitcoin.crypto.pointFromScalar(tweakedPrivateKey, true);
-    
-    console.log('[TAPROOT] Signer tweaked successfully');
-    
+
+    const PTweak = window.ecc.pointFromScalar(dTweak, true);
+    if (!PTweak) {
+      throw new Error('Failed to compute tweaked public key');
+    }
+
     return {
-      publicKey: Buffer.from(tweakedPublicKey),
-      signSchnorr: (hash) => {
-        const randomBytes = crypto.getRandomValues(new Uint8Array(32));
-        return bitcoin.crypto.signSchnorr(hash, tweakedPrivateKey, Buffer.from(randomBytes));
+      publicKey: PTweak,
+      signSchnorr: (msg32) => {
+        const auxRand = crypto.getRandomValues(new Uint8Array(32));
+        return window.ecc.signSchnorr(msg32, dTweak, auxRand);
       }
     };
   }
 
-  static async prepareTaprootUtxo(utxo, hdWallet) {
+  static async createTaprootAddress(publicKey, network) {
+    if (!window.bitcoin || !window.bitcoin.payments) {
+      throw new Error('Bitcoin library not available');
+    }
+    const internalPubkey = TaprootUtils.toXOnly(publicKey);
+    const payment = window.bitcoin.payments.p2tr({ internalPubkey, network });
+    return { address: payment.address, output: payment.output, internalPubkey };
+  }
+
+  static async prepareTaprootUtxo(utxo) {
     try {
-      if (!hdWallet || utxo.scriptType !== 'p2tr') {
+      // If already enriched, return as-is
+      if (utxo && utxo.tapInternalKey && utxo.keyPair && utxo.scriptType === 'p2tr') {
         return utxo;
       }
-
-      console.log(`[TAPROOT] Preparing taproot UTXO: ${utxo.txid}:${utxo.vout}`);
-
-      // If UTXO already has taproot data, return as-is
-      if (utxo.tapInternalKey && utxo.keyPair) {
-        console.log('[TAPROOT] UTXO already has taproot data');
-        return utxo;
+      // Try to obtain taproot keypair from global helper
+      let kp = null;
+      if (typeof window.getTaprootKeyPair === 'function') {
+        kp = await window.getTaprootKeyPair();
       }
-
-      // Try to derive the key pair for this UTXO
-      if (hdWallet.deriveKeyFor) {
-        // We need to find which derivation path this UTXO belongs to
-        // For now, try the standard taproot path
-        try {
-          const keyInfo = hdWallet.deriveKeyFor('taproot', 0, 0);
-          if (keyInfo && keyInfo.keyPair && keyInfo.tapInternalKey) {
-            console.log('[TAPROOT] Successfully derived key pair for UTXO');
-            return {
-              ...utxo,
-              keyPair: keyInfo.keyPair,
-              tapInternalKey: keyInfo.tapInternalKey
-            };
-          }
-        } catch (error) {
-          console.warn('[TAPROOT] Could not derive key pair for UTXO:', error);
-        }
+      if (!kp && window.hdManager && typeof window.hdManager.getTaprootKeyPair === 'function') {
+        try { kp = await window.hdManager.getTaprootKeyPair(); } catch (_) {}
       }
-
-      // Fallback: try to get from global taproot functions
-      if (window.getTaprootKeyPair && window.getTaprootPublicKey) {
-        const keyPair = await window.getTaprootKeyPair();
-        const taprootPublicKey = await window.getTaprootPublicKey();
-        
-        if (keyPair && taprootPublicKey) {
-          console.log('[TAPROOT] Using global taproot key pair');
-          return {
-            ...utxo,
-            keyPair: keyPair,
-            tapInternalKey: Buffer.from(taprootPublicKey)
-          };
-        }
+      if (!kp || !kp.publicKey) {
+        throw new Error('Missing taproot keypair for UTXO preparation');
       }
-
-      console.warn('[TAPROOT] Could not prepare taproot UTXO - missing key data');
-      return utxo;
-    } catch (error) {
-      console.error('[TAPROOT] Error preparing taproot UTXO:', error);
-      return utxo;
+      const xonly = TaprootUtils.toXOnly(Buffer.from(kp.publicKey));
+      const enriched = { ...utxo, keyPair: kp, tapInternalKey: xonly, scriptType: (utxo.scriptType || 'p2tr') };
+      return enriched;
+    } catch (e) {
+      throw e;
     }
   }
+
 }
 
+// Expose to window for consumers that don't import (e.g., wallet.js)
+if (typeof window !== 'undefined') {
+  window.TaprootUtils = TaprootUtils;
+}
 // Filter mature UTXOs (coinbase and confirmation checks)
 async function filterMatureUtxos(utxoList) {
   if (!Array.isArray(utxoList) || !utxoList.length) return [];
@@ -358,7 +364,7 @@ armInactivityTimerSafely();
           workingUtxos = matureUtxos.filter(u => u.scriptType === 'p2tr');
           // Prepare taproot UTXOs
           workingUtxos = await Promise.all(
-            workingUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo, hdWallet))
+            workingUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo))
           );
         } else {
           workingUtxos = matureUtxos.filter(u => ['p2wpkh', 'p2pkh', 'p2sh'].includes(u.scriptType));
@@ -369,7 +375,7 @@ armInactivityTimerSafely();
           workingUtxos = filteredUtxos.filter(u => u.scriptType === 'p2tr');
           // Prepare taproot UTXOs
           workingUtxos = await Promise.all(
-            workingUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo, hdWallet))
+            workingUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo))
           );
         } else {
           workingUtxos = filteredUtxos.filter(u => ['p2wpkh', 'p2pkh', 'p2sh'].includes(u.scriptType));
@@ -658,7 +664,7 @@ export async function consolidateUtxos() {
       // Prepare taproot UTXOs with key pairs
       console.log(`[CONSOLIDATION] Preparing ${rawUtxos.length} taproot UTXOs`);
       rawUtxos = await Promise.all(
-        rawUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo, hdWallet))
+        rawUtxos.map(utxo => TaprootUtils.prepareTaprootUtxo(utxo))
       );
       
       console.log(`[CONSOLIDATION] Found ${rawUtxos.length} taproot UTXOs`);
