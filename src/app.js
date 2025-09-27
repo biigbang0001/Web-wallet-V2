@@ -15,12 +15,10 @@ function getTranslation(key, fallback, params = {}) {
 // === OPERATIONS TRACKING ===
 export function startOperation(operationType) {
   OPERATION_STATE.activeOperations.add(operationType);
-  console.log(`[OPERATION] Started: ${operationType}`);
 }
 
 export function endOperation(operationType) {
   OPERATION_STATE.activeOperations.delete(operationType);
-  console.log(`[OPERATION] Ended: ${operationType}`);
 }
 
 export function isOperationActive(operationType = null) {
@@ -207,10 +205,7 @@ function setupAutoReloadOnKeyClear() {
     if (clearDetected) return;
     clearDetected = true;
     
-    console.log('[SECURITY] Keys cleared - preparing auto-reload');
-    
     if (isOperationActive()) {
-      console.log('[SECURITY] Operation in progress, delaying auto-reload');
       clearTimer = setTimeout(() => {
         if (!isOperationActive()) {
           executeAutoReload();
@@ -225,8 +220,6 @@ function setupAutoReloadOnKeyClear() {
   };
   
   const executeAutoReload = () => {
-    console.log('[SECURITY] Executing auto-reload...');
-    
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -265,7 +258,6 @@ function setupAutoReloadOnKeyClear() {
   eventBus.on(EVENTS.KEYS_CLEARED, handleKeyClear);
   eventBus.on(EVENTS.SESSION_EXPIRED, handleKeyClear);
   
-  // Surveillance UNIQUEMENT des nettoyages de clés sécurisées
   const originalLog = console.log;
   console.log = function(...args) {
     const message = args.join(' ');
@@ -322,9 +314,7 @@ export class NITOWalletApp {
     try {
       localStorage.setItem('test', 'test');
       localStorage.removeItem('test');
-    } catch (_) {
-      console.warn('localStorage not available');
-    }
+    } catch (_) {}
   }
 
   // === DEPENDENCY LOADING ===
@@ -350,13 +340,11 @@ export class NITOWalletApp {
     return new Promise((resolve) => {
       try {
         if (!window.i18next) { 
-          console.warn('i18next not available');
           resolve(); 
           return; 
         }
 
         const savedLng = localStorage.getItem('nito_lang') || UI_CONFIG?.DEFAULT_LANGUAGE || 'fr';
-        console.log(`[I18N] Initializing with language: ${savedLng}`);
 
         window.i18next
           .use(window.i18nextHttpBackend)
@@ -373,7 +361,6 @@ export class NITOWalletApp {
             initImmediate: false
           }, async (err) => {
             if (err) { 
-              console.warn('i18next init error:', err);
               if (savedLng !== 'fr') {
                 await this.retryI18nWithFallback();
               }
@@ -381,22 +368,22 @@ export class NITOWalletApp {
               return; 
             }
 
-            console.log(`[I18N] Successfully initialized with: ${window.i18next.language}`);
-            
             const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
             if (sel) {
               sel.value = window.i18next.language;
-              console.log(`[I18N] Language selector set to: ${sel.value}`);
             }
 
             await this.applyTranslationsWithRetry();
 
             const changeLanguage = async (lng) => {
-              console.log(`[I18N] Changing language to: ${lng}`);
               await window.i18next.changeLanguage(lng);
               localStorage.setItem('nito_lang', lng);
               await this.applyTranslationsWithRetry();
-              console.log(`[I18N] Language changed successfully to: ${lng}`);
+              
+              const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
+              if (selector) {
+                selector.value = lng;
+              }
             };
 
             if (sel) {
@@ -411,7 +398,6 @@ export class NITOWalletApp {
             resolve();
           });
       } catch (error) {
-        console.warn('i18next setup failed:', error);
         resolve();
       }
     });
@@ -421,26 +407,20 @@ export class NITOWalletApp {
     try {
       await window.i18next.changeLanguage('fr');
       localStorage.setItem('nito_lang', 'fr');
-      console.log('[I18N] Fallback to French successful');
-    } catch (error) {
-      console.warn('[I18N] Fallback failed:', error);
-    }
+    } catch (error) {}
   }
 
   async applyTranslationsWithRetry() {
     for (let attempt = 0; attempt < UI_CONFIG.TRANSLATION_RETRY_ATTEMPTS; attempt++) {
       try {
         await this.updateTranslations();
-        console.log(`[I18N] Translations applied successfully on attempt ${attempt + 1}`);
         return;
       } catch (error) {
-        console.warn(`[I18N] Translation attempt ${attempt + 1} failed:`, error);
         if (attempt < UI_CONFIG.TRANSLATION_RETRY_ATTEMPTS - 1) {
           await new Promise(r => setTimeout(r, UI_CONFIG.TRANSLATION_RETRY_DELAY));
         }
       }
     }
-    console.error('[I18N] All translation attempts failed');
   }
 
   async updateTranslations() {
@@ -468,9 +448,7 @@ export class NITOWalletApp {
           const t = window.i18next.t(key);
           if (t && t !== key) el.textContent = t;
         }
-      } catch (error) {
-        console.warn(`[I18N] Failed to translate element with key: ${el.getAttribute('data-i18n')}`, error);
-      }
+      } catch (error) {}
     });
 
     const h1 = document.querySelector('h1');
@@ -486,8 +464,11 @@ export class NITOWalletApp {
         warning.innerHTML = window.DOMPurify.sanitize(t);
       }
     }
-
-    console.log('[I18N] DOM translations updated');
+    
+    const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
+    if (selector && window.i18next) {
+      selector.value = window.i18next.language;
+    }
   }
 
   // === THEME SYSTEM ===
@@ -602,44 +583,37 @@ export class NITOWalletApp {
   setupBalanceManagement() {
     const updateSendTabBalance = async () => {
       if (isOperationActive('balance-refresh')) {
-        console.log('[BALANCE] Refresh already in progress, skipping');
         return;
       }
       
       startOperation('balance-refresh');
       
       try {
-        console.log('[BALANCE] updateSendTabBalance invoked');
         const selector = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE);
         const output = document.getElementById(ELEMENT_IDS.SEND_TAB_BALANCE);
         if (!selector || !output) return;
 
         const addressType = selector.value;
-        console.log('[BALANCE] addressType:', addressType);
         let address = '';
         if (addressType === 'p2tr') {
           address = window.getTaprootAddress ? window.getTaprootAddress() : '';
-          console.log('[BALANCE] Taproot address:', address);
         } else {
           address = window.getWalletAddress ? window.getWalletAddress() : '';
-          console.log('[BALANCE] Bech32 address:', address);
         }
 
         if (!address) { 
-          console.warn('[BALANCE] No address for type', addressType); 
           output.textContent = '0.00000000'; 
           return; 
         }
         
         if (window.balance) {
           const balance = await window.balance(address);
-          console.log('[BALANCE] address', address, 'balance', balance);
           output.textContent = (balance || 0).toFixed(8);
         } else {
           output.textContent = '0.00000000';
         }
       } catch (error) {
-        console.error('[BALANCE] Balance update error:', error);
+        console.error('Balance update error:', error);
       } finally {
         endOperation('balance-refresh');
       }
@@ -660,7 +634,6 @@ export class NITOWalletApp {
   setupRefreshSystem() {
     const refreshAllBalances = async () => {
       if (isOperationActive('full-refresh')) {
-        console.log('[REFRESH] Full refresh already in progress');
         return;
       }
       
@@ -678,7 +651,6 @@ export class NITOWalletApp {
           if (maybePromise && typeof maybePromise.then === 'function') {
             await maybePromise;
           }
-          console.log('[REFRESH] Caches cleared');
         }
         
         await new Promise(r => setTimeout(r, 800));
@@ -700,7 +672,7 @@ export class NITOWalletApp {
         await new Promise(r => setTimeout(r, 1200));
         
       } catch (error) {
-        console.error('[REFRESH] Error:', error);
+        console.error('Refresh error:', error);
         showBalanceLoadingSpinner(true, 'loading.update_error');
         await new Promise(r => setTimeout(r, 1500));
       } finally {
@@ -849,14 +821,12 @@ export class NITOWalletApp {
       ev.preventDefault();
       ev.stopPropagation();
       
-      console.log('[REFRESH] Click detected:', { source: btn.id });
-      
       const t = (window.i18next && typeof window.i18next.t === 'function') 
         ? window.i18next.t 
         : (key, fallback) => fallback || key;
       
       const originalText = btn.textContent;
-      const originalStyle = btn.style.cssText;
+      const originalDisabled = btn.disabled;
       
       btn.disabled = true;
       btn.textContent = t('loading.refreshing', '⌛ Actualisation...');
@@ -867,17 +837,14 @@ export class NITOWalletApp {
         if (typeof window.refreshAllBalances === 'function') {
           await window.refreshAllBalances();
         }
-        console.log('[REFRESH] Completed:', { source: btn.id });
       } catch (e) {
-        console.error('[REFRESH] Error:', e);
+        console.error('Refresh error:', e);
       } finally {
-        btn.disabled = false;
+        btn.disabled = originalDisabled;
         btn.textContent = originalText;
-        btn.style.cssText = originalStyle;
+        btn.style.cssText = originalText;
       }
     });
-
-    console.log('[SETUP] Global refresh handlers initialized');
   }
 
   // === COMPLETION ===
@@ -913,9 +880,7 @@ export class NITOWalletApp {
       console.log('Legacy:', addresses.legacy);
       console.log('P2SH:', addresses.p2sh);
       console.log('========================');
-    } catch (error) {
-      console.warn('Could not log wallet addresses:', error);
-    }
+    } catch (error) {}
   }
 
   // === ERROR HANDLING ===
