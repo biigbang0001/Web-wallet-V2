@@ -1,0 +1,32 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Engrenage qui tourne">
+  <defs>
+    <style>
+      .metal { fill:#697386; }
+      .hub { fill:#A7B0C0; }
+      .bg { fill:#ffffff; }
+    </style>
+  </defs>
+  <rect class="bg" width="120" height="120" fill="none"/>
+  <g transform="translate(60,60)">
+    <!-- dents -->
+    <g id="teeth">
+      <!-- 8 dents -->
+      <rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/>
+      <g transform="rotate(45)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(90)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(135)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(180)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(225)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(270)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+      <g transform="rotate(315)"><rect x="-6" y="-52" width="12" height="16" class="metal" rx="2"/></g>
+    </g>
+    <!-- couronne -->
+    <circle r="40" fill="#7D889B"/>
+    <circle r="28" fill="#E5E9F0"/>
+    <!-- moyeu -->
+    <circle r="10" class="hub"/>
+    <!-- rotation -->
+    <animateTransform attributeName="transform" type="rotate"
+      from="0 0 0" to="360 0 0" dur="2s" repeatCount="indefinite"/>
+  </g>
+</svg>
