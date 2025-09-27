@@ -780,19 +780,6 @@ function setupImportHandlers() {
     }
   });
 
-  addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
-    armInactivityTimerSafely();
-    
-    try {
-      setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
-      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
-await updateBalanceWithCacheClear();
-    } catch (error) {
-      console.error('[UI] Refresh balance error:', error);
-    } finally {
-      setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, false);
-    }
-  });
   
   console.log('[UI] Import handlers setup completed');
 }
@@ -991,19 +978,6 @@ if (balanceEl) {
     copyToClipboard(ELEMENT_IDS.SIGNED_TX);
   });
 
-  addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
-    armInactivityTimerSafely();
-    
-    try {
-      setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
-      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
-await updateBalanceWithCacheClear();
-      } catch (error) {
-      console.error('[UI] Send tab balance refresh error:', error);
-    } finally {
-      setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, false);
-    }
-  });
   
   console.log('[UI] Transaction handlers setup completed');
 }
