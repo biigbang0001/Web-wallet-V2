@@ -5,39 +5,6 @@ import { MESSAGING_CONFIG, NITO_NETWORK, ELEMENT_IDS, NODE_CONFIG, FEATURE_FLAGS
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
-// === TRANSLATION HELPER ===
-function getTranslation(key, fallback, params = {}) {
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
-    : () => fallback || key;
-  return t(key, { ...params, defaultValue: fallback });
-}
-
-// === OPERATIONS TRACKING ===
-const OPERATION_TYPES = {
-  PUBLISH_PUBKEY: 'publish_pubkey',
-  SEND_MESSAGE: 'send_message',
-  SCAN_MESSAGES: 'scan_messages',
-  REFRESH_MESSAGES: 'refresh_messages'
-};
-
-const activeOperations = new Set();
-
-function startOperation(operationType) {
-  activeOperations.add(operationType);
-}
-
-function endOperation(operationType) {
-  activeOperations.delete(operationType);
-}
-
-function isOperationActive(operationType = null) {
-  if (operationType) {
-    return activeOperations.has(operationType);
-  }
-  return activeOperations.size > 0;
-}
-
 // === ERROR HANDLING WITH RETRY ===
 async function handleError500WithRetry(operation, maxRetries = 3) {
   let attempt = 0;
@@ -384,11 +351,11 @@ export class NitoMessaging {
 
   // === PUBLIC KEY MANAGEMENT ===
   async publishPublicKey() {
-    if (isOperationActive(OPERATION_TYPES.PUBLISH_PUBKEY)) {
+    if (window.isOperationActive && window.isOperationActive('publish_pubkey')) {
       throw new Error('Publication déjà en cours');
     }
     
-    startOperation(OPERATION_TYPES.PUBLISH_PUBKEY);
+    if (window.startOperation) window.startOperation('publish_pubkey');
     
     try {
       this.checkInitialized();
@@ -400,7 +367,7 @@ export class NitoMessaging {
       let availableUtxos = await this.getAvailableUtxos(messagingState.bech32Address);
       availableUtxos = availableUtxos.filter(utxo => utxo.amount >= 0.000003);
       if (availableUtxos.length === 0) {
-        const errorMsg = getTranslation('messaging.no_utxo_for_pubkey', 'Aucun UTXO disponible pour publier la clé publique');
+        const errorMsg = window.getTranslation ? window.getTranslation('messaging.no_utxo_for_pubkey', 'Aucun UTXO disponible pour publier la clé publique') : 'Aucun UTXO disponible pour publier la clé publique';
         throw new Error(errorMsg);
       }
 
@@ -424,10 +391,10 @@ export class NitoMessaging {
       return { success: true, txid, publicKey: publicKeyHex };
     } catch (error) {
       console.error('[MESSAGING] Erreur publication clé publique:', error);
-      const errorMsg = getTranslation('messaging.publication_error', 'Erreur publication: {{error}}', { error: error.message });
+      const errorMsg = window.getTranslation ? window.getTranslation('messaging.publication_error', 'Erreur publication: {{error}}', { error: error.message }) : `Erreur publication: ${error.message}`;
       throw new Error(errorMsg);
     } finally {
-      endOperation(OPERATION_TYPES.PUBLISH_PUBKEY);
+      if (window.endOperation) window.endOperation('publish_pubkey');
     }
   }
 
@@ -664,11 +631,11 @@ export class NitoMessaging {
 
   // === MAIN SEND MESSAGE FUNCTION ===
   async sendMessage(message, recipientBech32Address) {
-    if (isOperationActive(OPERATION_TYPES.SEND_MESSAGE)) {
+    if (window.isOperationActive && window.isOperationActive('send_message')) {
       throw new Error('Envoi de message déjà en cours');
     }
     
-    startOperation(OPERATION_TYPES.SEND_MESSAGE);
+    if (window.startOperation) window.startOperation('send_message');
     
     try {
       this.checkInitialized();
@@ -693,7 +660,7 @@ export class NitoMessaging {
       }
 
       if (availableUtxos.length < chunks.length) {
-        const errorMsg = getTranslation('messaging.insufficient_utxos_no_conflict', 'UTXOs insuffisants pour envoyer {{chunks}} chunks sans conflit.', { chunks: chunks.length });
+        const errorMsg = window.getTranslation ? window.getTranslation('messaging.insufficient_utxos_no_conflict', 'UTXOs insuffisants pour envoyer {{chunks}} chunks sans conflit.', { chunks: chunks.length }) : `UTXOs insuffisants pour envoyer ${chunks.length} chunks sans conflit.`;
         throw new Error(errorMsg);
       }
 
@@ -703,20 +670,20 @@ export class NitoMessaging {
       console.error("[MESSAGING] Erreur envoi message:", error);
       throw error;
     } finally {
-      endOperation(OPERATION_TYPES.SEND_MESSAGE);
+      if (window.endOperation) window.endOperation('send_message');
     }
   }
 
   // === MESSAGE SCANNING ===
   async scanInboxMessages() {
-    if (isOperationActive(OPERATION_TYPES.SCAN_MESSAGES)) {
-      while (isOperationActive(OPERATION_TYPES.SCAN_MESSAGES)) {
+    if (window.isOperationActive && window.isOperationActive('scan_messages')) {
+      while (window.isOperationActive && window.isOperationActive('scan_messages')) {
         await this.sleep(500);
       }
       return this.messageCache.get('lastScanResult') || [];
     }
     
-    startOperation(OPERATION_TYPES.SCAN_MESSAGES);
+    if (window.startOperation) window.startOperation('scan_messages');
     
     try {
       this.checkInitialized();
@@ -833,7 +800,7 @@ export class NitoMessaging {
       console.error('[MESSAGING] Erreur scan messages:', error);
       throw error;
     } finally {
-      endOperation(OPERATION_TYPES.SCAN_MESSAGES);
+      if (window.endOperation) window.endOperation('scan_messages');
     }
   }
 
@@ -1301,18 +1268,18 @@ function setupMessagingButtons() {
   const publishButton = document.getElementById('publishPubkeyButton');
   if (publishButton) {
     publishButton.addEventListener('click', async () => {
-      if (isOperationActive(OPERATION_TYPES.PUBLISH_PUBKEY)) {
+      if (window.isOperationActive && window.isOperationActive('publish_pubkey')) {
         alert('Publication déjà en cours...');
         return;
       }
       
       try {
-        showLoadingSpinner(true);
+        if (window.showLoading) window.showLoading(true);
         const result = await messaging.publishPublicKey();
       } catch (error) {
         alert(`Erreur: ${error.message}`);
       } finally {
-        showLoadingSpinner(false);
+        if (window.hideLoading) window.hideLoading();
       }
     });
   }
@@ -1337,13 +1304,13 @@ function setupMessagingButtons() {
   const confirmButton = document.getElementById('confirmSendButton');
   if (confirmButton) {
     confirmButton.addEventListener('click', async () => {
-      if (isOperationActive(OPERATION_TYPES.SEND_MESSAGE)) {
+      if (window.isOperationActive && window.isOperationActive('send_message')) {
         alert('Envoi déjà en cours...');
         return;
       }
       
       try {
-        showLoadingSpinner(true);
+        if (window.showLoading) window.showLoading(true);
         const message = document.getElementById('messageInput').value.trim();
         const recipient = document.getElementById('recipientAddress').value.trim();
 
@@ -1371,7 +1338,7 @@ function setupMessagingButtons() {
       } catch (error) {
         alert(`Erreur: ${error.message}`);
       } finally {
-        showLoadingSpinner(false);
+        if (window.hideLoading) window.hideLoading();
       }
     });
   }
@@ -1395,20 +1362,20 @@ function setupMessagingButtons() {
   const refreshButton = document.getElementById('refreshMessagesButton');
   if (refreshButton) {
     refreshButton.addEventListener('click', async () => {
-      if (isOperationActive(OPERATION_TYPES.REFRESH_MESSAGES)) {
+      if (window.isOperationActive && window.isOperationActive('refresh_messages')) {
         return;
       }
       
-      startOperation(OPERATION_TYPES.REFRESH_MESSAGES);
+      if (window.startOperation) window.startOperation('refresh_messages');
       
       try {
         const originalText = refreshButton.textContent;
         const originalDisabled = refreshButton.disabled;
         
         refreshButton.disabled = true;
-        refreshButton.textContent = getTranslation('loading.refreshing', '⌛ Actualisation...');
+        refreshButton.textContent = window.getTranslation ? window.getTranslation('loading.refreshing', '⌛ Actualisation...') : '⌛ Actualisation...';
         
-        showLoadingSpinner(true);
+        if (window.showLoading) window.showLoading(true);
         const messages = await messaging.scanInboxMessages();
         displayMessages(messages);
         updateUnreadCounter(messages.filter(m => m.status === 'unread').length);
@@ -1419,10 +1386,10 @@ function setupMessagingButtons() {
       } catch (error) {
         alert(`Erreur: ${error.message}`);
         refreshButton.disabled = false;
-        refreshButton.textContent = getTranslation('encrypted_messaging.refresh_messages', '🔄 Actualiser les messages');
+        refreshButton.textContent = window.getTranslation ? window.getTranslation('encrypted_messaging.refresh_messages', '🔄 Actualiser les messages') : '🔄 Actualiser les messages';
       } finally {
-        showLoadingSpinner(false);
-        endOperation(OPERATION_TYPES.REFRESH_MESSAGES);
+        if (window.hideLoading) window.hideLoading();
+        if (window.endOperation) window.endOperation('refresh_messages');
       }
     });
   }
@@ -1522,31 +1489,6 @@ function updateUnreadCounter(count) {
   }
 }
 
-function showLoadingSpinner(show) {
-  const spinner = document.getElementById('loadingSpinner');
-  if (spinner) {
-    spinner.style.display = show ? 'block' : 'none';
-  }
-
-  let progressElement = document.getElementById('messageProgress');
-  if (show && !progressElement) {
-    progressElement = document.createElement('div');
-    progressElement.id = 'messageProgress';
-    progressElement.style.position = 'fixed';
-    progressElement.style.top = '50%';
-    progressElement.style.left = '50%';
-    progressElement.style.transform = 'translate(-50%, -50%)';
-    progressElement.style.zIndex = '1000';
-    progressElement.style.background = 'rgba(255, 255, 255, 0.95)';
-    progressElement.style.padding = '20px';
-    progressElement.style.borderRadius = '8px';
-    progressElement.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
-    document.body.appendChild(progressElement);
-  } else if (!show && progressElement) {
-    document.body.removeChild(progressElement);
-  }
-}
-
 // === TESTING FUNCTIONS ===
 window.testFullMessaging = async function() {
   try {
@@ -1579,9 +1521,6 @@ if (typeof window !== 'undefined') {
   window.messaging = messaging;
   window.renderInboxEmailStyle = renderInboxEmailStyle;
   window.showMessageModal = showMessageModal;
-  window.isMessagingOperationActive = isOperationActive;
-  window.startMessagingOperation = startOperation;
-  window.endMessagingOperation = endOperation;
 }
 
 // === INITIALIZATION UNIQUE ===
