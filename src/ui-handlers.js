@@ -72,7 +72,7 @@ function endOperation(operationType) {
   }
 }
 
-// === LOADING SYSTEM ===
+// === LOADING SYSTEM WITH I18N ===
 function showLoadingSpinner(show) {
   const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
   if (spinner) {
@@ -162,6 +162,66 @@ function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
   }
 }
 
+function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh') {
+  let modal = document.getElementById('balanceLoadingModal');
+  
+  if (show) {
+    const t = (window.i18next && typeof window.i18next.t === 'function') 
+      ? window.i18next.t 
+      : (key, fallback) => fallback || key;
+    
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'balanceLoadingModal';
+      modal.style.cssText = `
+        display: flex;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.4);
+        backdrop-filter: blur(6px);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      `;
+      
+      document.body.appendChild(modal);
+    }
+    
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    const message = t(messageKey, 'Actualisation du solde…');
+    const subtitle = t('loading.blockchain_scan', 'Scan blockchain en cours...');
+    
+    modal.innerHTML = `
+      <div style="
+        background: ${isDarkMode ? '#1a202c' : '#ffffff'};
+        color: ${isDarkMode ? '#e2e8f0' : '#111111'};
+        border: 1px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
+        padding: 2rem 2.5rem;
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,${isDarkMode ? '0.6' : '0.25'});
+        text-align: center;
+        min-width: 320px;
+        max-width: 90vw;
+        backdrop-filter: blur(15px);
+        border: 2px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};
+      ">
+        <div style="font-size:3rem; line-height:1; margin-bottom:1.2rem; animation: rotate 1.5s linear infinite;">⌛</div>
+        <div class="loading-text" style="font-weight:700; font-size: 20px; margin-bottom: 0.8rem; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">${message}</div>
+        <div style="font-size: 15px; opacity: 0.8; margin-bottom: 1rem;">${subtitle}</div>
+        <div style="width: 100%; background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 10px; height: 6px; overflow: hidden;">
+          <div style="width: 100%; height: 100%; background: linear-gradient(90deg, ${isDarkMode ? '#3b82f6' : '#2563eb'}, ${isDarkMode ? '#1e40af' : '#1d4ed8'}); border-radius: 10px; animation: loading-bar 2s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    `;
+    
+    modal.style.display = 'flex';
+  } else {
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+}
+
 function setButtonLoading(buttonId, loading, originalText = null) {
   const button = document.getElementById(buttonId);
   if (!button) return;
@@ -191,7 +251,7 @@ function setButtonLoading(buttonId, loading, originalText = null) {
   }
 }
 
-// === BALANCE FUNCTIONS ===
+// === BALANCE UPDATE FUNCTIONS ===
 async function updateBalance() {
   try {
     armInactivityTimerSafely();
@@ -208,7 +268,7 @@ async function updateBalance() {
   }
 }
 
-async function updateBalanceWithForceRefresh() {
+async function updateBalanceWithAnimation() {
   if (isOperationActive('balance-update')) {
     console.log('[UI] Balance update already in progress');
     return;
@@ -222,20 +282,6 @@ async function updateBalanceWithForceRefresh() {
   }
   
   try {
-    if (window.clearBlockchainCaches) {
-      const maybePromise = window.clearBlockchainCaches();
-      if (maybePromise && typeof maybePromise.then === 'function') {
-        await maybePromise;
-      }
-      console.log('[REFRESH] Caches cleared for manual refresh');
-    }
-    
-    await new Promise(r => setTimeout(r, 500));
-    
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(true, 'loading.utxo_scan');
-    }
-    
     if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
       await window.updateSendTabBalance();
     }
@@ -244,7 +290,7 @@ async function updateBalanceWithForceRefresh() {
     
     if (window.showBalanceLoadingSpinner) {
       window.showBalanceLoadingSpinner(true, 'loading.balance_updated');
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 1000));
     }
     
   } catch (error) {
@@ -258,6 +304,48 @@ async function updateBalanceWithForceRefresh() {
       window.showBalanceLoadingSpinner(false);
     }
     endOperation('balance-update');
+  }
+}
+
+async function updateBalanceWithCacheClear() {
+  if (isOperationActive('balance-refresh')) {
+    console.log('[UI] Balance refresh already in progress');
+    return;
+  }
+  
+  armInactivityTimerSafely();
+  startOperation('balance-refresh');
+  
+  showBalanceLoadingSpinner(true, 'loading.cache_clearing');
+  
+  try {
+    if (window.clearBlockchainCaches) {
+      const maybePromise = window.clearBlockchainCaches();
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        await maybePromise;
+      }
+      console.log('[REFRESH] Caches cleared');
+    }
+    
+    await new Promise(r => setTimeout(r, 800));
+    showBalanceLoadingSpinner(true, 'loading.utxo_scan');
+    
+    if (typeof window.updateSendTabBalance === 'function') {
+      await window.updateSendTabBalance();
+    }
+    
+    await updateBalance();
+    
+    showBalanceLoadingSpinner(true, 'loading.balance_updated');
+    await new Promise(r => setTimeout(r, 1200));
+    
+  } catch (error) {
+    console.error('[UI] Balance update error:', error);
+    showBalanceLoadingSpinner(true, 'loading.update_error');
+    await new Promise(r => setTimeout(r, 1500));
+  } finally {
+    showBalanceLoadingSpinner(false);
+    endOperation('balance-refresh');
   }
 }
 
@@ -275,7 +363,7 @@ async function showSuccessPopup(txid) {
   }
 }
 
-// === UI HELPER FUNCTIONS ===
+// === WALLET DISPLAY FUNCTIONS ===
 function hideAllAuthForms() {
   const emailForm = document.getElementById('emailForm');
   const keyForm = document.getElementById('keyForm');
@@ -338,11 +426,17 @@ function displayWalletInfo(addresses, importType) {
     console.log('========================');
   }
   
-  setTimeout(() => {
-    updateBalance();
-  }, 1000);
-  
-  injectConsolidateButton();
+  if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} }
+window.__postImportRefreshTimer = setTimeout(() => {
+  // Use cache-clear variant after import to avoid stale 0 balance
+  // and rely on op guard to prevent overlap
+  if (window.isOperationActive && (window.isOperationActive('balance-update') || window.isOperationActive('balance-refresh'))) {
+    return;
+  }
+  updateBalanceWithCacheClear();
+  window.__postImportRefreshTimer = null;
+}, 1000);
+injectConsolidateButton();
 }
 
 function injectConsolidateButton() {
@@ -371,7 +465,7 @@ function injectConsolidateButton() {
       
       if (window.consolidateUtxos) {
         await window.consolidateUtxos();
-        setTimeout(() => updateBalance(), 3000);
+        setTimeout(() => updateBalanceWithCacheClear(), 3000);
       } else {
         const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
         alert(errorMsg);
@@ -691,7 +785,8 @@ function setupImportHandlers() {
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
-      await updateBalanceWithForceRefresh();
+      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
+await updateBalanceWithCacheClear();
     } catch (error) {
       console.error('[UI] Refresh balance error:', error);
     } finally {
@@ -762,11 +857,13 @@ function setupTransactionHandlers() {
         return;
       }
       
-      if (window.getTotalBalance) {
-        const totalBal = await window.getTotalBalance();
-        const maxAmount = Math.max(0, totalBal - 0.0001);
-        document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = maxAmount.toFixed(8);
-      }
+      const balanceEl = document.getElementById('totalBalance');
+if (balanceEl) {
+  const txt = (balanceEl.textContent || '').replace(/[^0-9.]/g, '');
+  const currentBal = parseFloat(txt) || 0;
+  const maxAmount = Math.max(0, currentBal - 0.0001);
+  document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = maxAmount.toFixed(8);
+}
     } catch (error) {
       console.error('[UI] MAX button error:', error);
     }
@@ -866,7 +963,7 @@ function setupTransactionHandlers() {
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
       
-      setTimeout(() => updateBalance(), 2000);
+      setTimeout(() => updateBalanceWithCacheClear(), 2000);
       
       console.log('[UI] Transaction broadcast successfully:', txid);
     } catch (error) {
@@ -899,11 +996,9 @@ function setupTransactionHandlers() {
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
-      await updateBalanceWithForceRefresh();
-      if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
-        await window.updateSendTabBalance();
-      }
-    } catch (error) {
+      if (window.__postImportRefreshTimer) { try { clearTimeout(window.__postImportRefreshTimer); } catch(e) {} window.__postImportRefreshTimer = null; }
+await updateBalanceWithCacheClear();
+      } catch (error) {
       console.error('[UI] Send tab balance refresh error:', error);
     } finally {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, false);
@@ -964,7 +1059,7 @@ function initializeWhenReady() {
   }
 }
 
-// === LANGUAGE CHANGE LISTENER ===
+// === RE-SETUP ON LANGUAGE CHANGE ===
 if (typeof window !== 'undefined') {
   if (window.i18next && typeof window.i18next.on === 'function') {
     window.i18next.on('languageChanged', () => {
@@ -992,8 +1087,10 @@ if (typeof window !== 'undefined') {
   window.setupUIHandlers = setupUIHandlers;
   window.cleanupUIHandlers = cleanupUIHandlers;
   window.updateBalance = updateBalance;
-  window.updateBalanceWithForceRefresh = updateBalanceWithForceRefresh;
+  window.updateBalanceWithAnimation = updateBalanceWithAnimation;
+  window.updateBalanceWithCacheClear = updateBalanceWithCacheClear;
   window.showConnectionLoadingSpinner = showConnectionLoadingSpinner;
+  window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
   window.addUniqueEventListener = addUniqueEventListener;
   window.removeEventListener = removeEventListener;
 }
