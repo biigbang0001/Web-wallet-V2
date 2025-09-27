@@ -1,5 +1,4 @@
 // NITO Wallet Application Entry Point 
-// Main orchestrator for initialization and module coordination
 
 import { CONFIG, VERSION, ELEMENT_IDS, UI_CONFIG, OPERATION_STATE, FEATURE_FLAGS } from './config.js';
 import { loadExternalLibraries, areLibrariesReady } from './vendor.js';
@@ -132,7 +131,6 @@ function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh')
       </div>
     `;
     
-    // Ajouter l'animation CSS si elle n'existe pas
     if (!document.querySelector('#loading-bar-style')) {
       const style = document.createElement('style');
       style.id = 'loading-bar-style';
@@ -198,7 +196,7 @@ class DependencyManager {
   }
 }
 
-// === ENHANCED AUTO-RELOAD SYSTEM ===
+// === AUTO-RELOAD SYSTEM ===
 function setupAutoReloadOnKeyClear() {
   if (!FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) return;
   
@@ -211,14 +209,13 @@ function setupAutoReloadOnKeyClear() {
     
     console.log('[SECURITY] Keys cleared - preparing auto-reload');
     
-    // Vérifier si une opération est en cours
     if (isOperationActive()) {
       console.log('[SECURITY] Operation in progress, delaying auto-reload');
       clearTimer = setTimeout(() => {
         if (!isOperationActive()) {
           executeAutoReload();
         } else {
-          handleKeyClear(); // Réessayer
+          handleKeyClear();
         }
       }, 5000);
       return;
@@ -230,7 +227,6 @@ function setupAutoReloadOnKeyClear() {
   const executeAutoReload = () => {
     console.log('[SECURITY] Executing auto-reload...');
     
-    // Afficher un message avant le rechargement
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -266,16 +262,14 @@ function setupAutoReloadOnKeyClear() {
     }, 2000);
   };
   
-  // Écouter les événements de nettoyage
   eventBus.on(EVENTS.KEYS_CLEARED, handleKeyClear);
   eventBus.on(EVENTS.SESSION_EXPIRED, handleKeyClear);
   
-  // Surveiller les logs de la console pour détecter les nettoyages
+  // Surveillance UNIQUEMENT des nettoyages de clés sécurisées
   const originalLog = console.log;
   console.log = function(...args) {
     const message = args.join(' ');
-    if (message.includes('All secure keys cleared') || 
-        message.includes('Blockchain caches cleared')) {
+    if (message.includes('All secure keys cleared')) {
       setTimeout(handleKeyClear, 100);
     }
     originalLog.apply(console, args);
@@ -351,7 +345,7 @@ export class NITOWalletApp {
     setupAutoReloadOnKeyClear();
   }
 
-  // === ROBUST INTERNATIONALIZATION ===
+  // === INTERNATIONALIZATION ===
   async initializeI18nRobust() {
     return new Promise((resolve) => {
       try {
@@ -380,7 +374,6 @@ export class NITOWalletApp {
           }, async (err) => {
             if (err) { 
               console.warn('i18next init error:', err);
-              // Essayer avec la langue de fallback
               if (savedLng !== 'fr') {
                 await this.retryI18nWithFallback();
               }
@@ -390,17 +383,14 @@ export class NITOWalletApp {
 
             console.log(`[I18N] Successfully initialized with: ${window.i18next.language}`);
             
-            // Sync select initial value
             const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
             if (sel) {
               sel.value = window.i18next.language;
               console.log(`[I18N] Language selector set to: ${sel.value}`);
             }
 
-            // Apply all translations with retry mechanism
             await this.applyTranslationsWithRetry();
 
-            // React to language changes
             const changeLanguage = async (lng) => {
               console.log(`[I18N] Changing language to: ${lng}`);
               await window.i18next.changeLanguage(lng);
@@ -409,9 +399,7 @@ export class NITOWalletApp {
               console.log(`[I18N] Language changed successfully to: ${lng}`);
             };
 
-            // Hook on selector
             if (sel) {
-              // Remove existing listeners
               const newSel = sel.cloneNode(true);
               sel.parentNode.replaceChild(newSel, sel);
               
@@ -458,7 +446,6 @@ export class NITOWalletApp {
   async updateTranslations() {
     if (!window.i18next) return;
 
-    // Attendre que les éléments DOM soient prêts
     await new Promise(resolve => {
       if (document.readyState === 'complete') {
         resolve();
@@ -467,11 +454,9 @@ export class NITOWalletApp {
       }
     });
 
-    // Elements with data-i18n
     document.querySelectorAll('[data-i18n]').forEach(el => {
       try {
         const key = el.getAttribute('data-i18n');
-        // Support syntax: [placeholder]foo.bar
         if (key.startsWith('[')) {
           const m = key.match(/^\[(.+?)\](.+)$/);
           if (m) {
@@ -488,14 +473,12 @@ export class NITOWalletApp {
       }
     });
 
-    // Title inside <h1> (second child node text)
     const h1 = document.querySelector('h1');
     if (h1 && h1.childNodes[1]) {
       const t = window.i18next.t('title');
       if (t && t !== 'title') h1.childNodes[1].textContent = t;
     }
 
-    // Warning block may contain markup -> sanitize if DOMPurify is present
     const warning = document.querySelector('.warning');
     if (warning && window.DOMPurify) {
       const t = window.i18next.t('generate_section.warning');
@@ -666,7 +649,6 @@ export class NITOWalletApp {
 
     document.addEventListener('change', (ev) => {
       if (ev.target && ev.target.id === ELEMENT_IDS.DEBIT_ADDRESS_TYPE) {
-        // Éviter le double refresh
         setTimeout(() => updateSendTabBalance(), 200);
       }
     });
@@ -676,7 +658,6 @@ export class NITOWalletApp {
   }
 
   setupRefreshSystem() {
-    // Fonction de mise à jour complète des soldes avec animation
     const refreshAllBalances = async () => {
       if (isOperationActive('full-refresh')) {
         console.log('[REFRESH] Full refresh already in progress');
@@ -692,7 +673,6 @@ export class NITOWalletApp {
       showBalanceLoadingSpinner(true, 'loading.cache_clearing');
       
       try {
-        // Clear blockchain caches if available to force a true UTXO refresh
         if (window.clearBlockchainCaches) {
           const maybePromise = window.clearBlockchainCaches();
           if (maybePromise && typeof maybePromise.then === 'function') {
@@ -701,16 +681,13 @@ export class NITOWalletApp {
           console.log('[REFRESH] Caches cleared');
         }
         
-        // Attendre un peu pour que le nettoyage prenne effet
         await new Promise(r => setTimeout(r, 800));
         showBalanceLoadingSpinner(true, 'loading.utxo_scan');
         
-        // Update send tab balance
-        if (typeof window.updateSendTabBalance === 'function') {
+        if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
           await window.updateSendTabBalance();
         }
         
-        // Update total balance display
         if (window.getTotalBalance) {
           const total = await window.getTotalBalance();
           const balanceElement = document.getElementById('totalBalance');
@@ -719,7 +696,6 @@ export class NITOWalletApp {
           }
         }
         
-        // Success message
         showBalanceLoadingSpinner(true, 'loading.balance_updated');
         await new Promise(r => setTimeout(r, 1200));
         
@@ -733,7 +709,6 @@ export class NITOWalletApp {
       }
     };
 
-    // Export global pour les autres modules
     if (typeof window !== 'undefined') {
       window.refreshAllBalances = refreshAllBalances;
       window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
@@ -806,7 +781,6 @@ export class NITOWalletApp {
           ? window.i18next.t('import_section.refresh_button', '🔄 Actualiser')
           : '🔄 Actualiser';
         
-        // Bouton principal section import
         const mainBtn = document.getElementById('refreshBalanceButton');
         if (mainBtn) {
           mainBtn.textContent = t;
@@ -827,7 +801,6 @@ export class NITOWalletApp {
           `;
         }
         
-        // Bouton section envoi - même style
         const sendBtn = document.getElementById(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE);
         if (sendBtn) {
           sendBtn.textContent = t;
@@ -850,25 +823,20 @@ export class NITOWalletApp {
       } catch {}
     };
 
-    // Application initiale
     document.addEventListener('DOMContentLoaded', setRefreshLabels);
     
-    // Réappliquer lors du changement de langue
     if (window.i18next && typeof window.i18next.on === 'function') {
       window.i18next.on('languageChanged', setRefreshLabels);
     }
     
-    // Export global
     if (typeof window !== 'undefined') {
       window.setRefreshLabels = setRefreshLabels;
     }
 
-    // Appliquer immédiatement
     setTimeout(setRefreshLabels, 100);
   }
 
   setupGlobalRefreshHandlers() {
-    // Gestionnaire unifié pour tous les boutons refresh
     document.addEventListener('click', async (ev) => {
       const btn = ev.target && ev.target.closest && ev.target.closest('button');
       if (!btn) return;
@@ -887,7 +855,6 @@ export class NITOWalletApp {
         ? window.i18next.t 
         : (key, fallback) => fallback || key;
       
-      // Désactiver le bouton pendant le refresh
       const originalText = btn.textContent;
       const originalStyle = btn.style.cssText;
       
@@ -904,7 +871,6 @@ export class NITOWalletApp {
       } catch (e) {
         console.error('[REFRESH] Error:', e);
       } finally {
-        // Restaurer le bouton
         btn.disabled = false;
         btn.textContent = originalText;
         btn.style.cssText = originalStyle;
@@ -927,7 +893,6 @@ export class NITOWalletApp {
     );
     console.log(readyMessage);
     
-    // Log des adresses si le wallet est importé
     if (FEATURE_FLAGS.LOG_ADDRESSES && window.isWalletReady && window.isWalletReady()) {
       this.logWalletAddresses();
     }
