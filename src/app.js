@@ -430,10 +430,13 @@ export class NITOWalletApp {
               return; 
             }
 
-            const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-            if (sel) {
-              sel.value = window.i18next.language;
-            }
+            // CORRECTION PRINCIPALE : Différer la mise à jour du sélecteur
+            setTimeout(() => {
+              const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
+              if (sel) {
+                sel.value = window.i18next.language || savedLng;
+              }
+            }, 100);
 
             await this.applyTranslationsWithRetry();
 
@@ -452,6 +455,8 @@ export class NITOWalletApp {
               }
             };
 
+            // Mettre à jour également le sélecteur dans le gestionnaire d'événements
+            const sel = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
             if (sel) {
               const newSel = sel.cloneNode(true);
               sel.parentNode.replaceChild(newSel, sel);  
@@ -536,6 +541,7 @@ export class NITOWalletApp {
       }
     }
     
+    // S'assurer que le sélecteur est synchronisé après les traductions
     const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
     if (selector && window.i18next) {
       selector.value = window.i18next.language;
