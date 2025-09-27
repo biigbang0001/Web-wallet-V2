@@ -406,12 +406,8 @@ export class NITOWalletApp {
           return; 
         }
 
-        // LIRE D'ABORD LE SÉLECTEUR, puis localStorage, puis 'en'
-        const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
-        const selectorValue = selector?.value;
-        const storedValue = localStorage.getItem('nito_lang');
-        
-        const savedLng = selectorValue || storedValue || 'en';
+        // Lire uniquement localStorage (ignorer le sélecteur HTML qui a "fr" par défaut)
+        const savedLng = localStorage.getItem('nito_lang') || 'en';
 
         window.i18next
           .use(window.i18nextHttpBackend)
@@ -473,12 +469,15 @@ export class NITOWalletApp {
       return;
     }
 
-    // S'assurer que la valeur initiale est correcte
+    // S'assurer que la valeur initiale correspond à la langue chargée
     selector.value = initialLang;
     
     // Nettoyer les anciens listeners pour éviter les doublons
     const newSelector = selector.cloneNode(true);
     selector.parentNode.replaceChild(newSelector, selector);
+    
+    // Forcer la valeur après remplacement
+    newSelector.value = initialLang;
     
     // Ajouter le nouvel event listener
     newSelector.addEventListener('change', (e) => {
@@ -559,12 +558,13 @@ export class NITOWalletApp {
       }
     }
     
-    // S'assurer que le sélecteur reflète la langue actuelle
+    // S'assurer que le sélecteur reflète la langue actuelle (forcer la synchronisation)
     const selector = document.getElementById(ELEMENT_IDS.LANGUAGE_SELECT);
     if (selector && window.i18next) {
       const currentLang = window.i18next.language;
       if (selector.value !== currentLang) {
         selector.value = currentLang;
+        console.log(`[i18n] Selector synchronized to: ${currentLang}`);
       }
     }
   }
