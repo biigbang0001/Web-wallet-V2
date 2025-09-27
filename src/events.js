@@ -63,7 +63,7 @@ export class EventMediator {
   constructor(options = {}) {
     this.listeners = new Map();
     this.debugMode = options.debug || false;
-    this.maxListeners = options.maxListeners || 30; // Réduit encore plus
+    this.maxListeners = options.maxListeners || 30;
     this.eventHistory = options.keepHistory ? [] : null;
     
     // Anti-duplication tracking
@@ -71,28 +71,24 @@ export class EventMediator {
     this.functionBodies = new WeakMap();
     
     // Timers and cleanup
-    this.cleanupTimer = setInterval(() => this.cleanup(), 180000); // 3 minutes
-    this.performanceTimer = setInterval(() => this.performanceCleanup(), 300000); // 5 minutes
+    this.cleanupTimer = setInterval(() => this.cleanup(), 180000);
+    this.performanceTimer = setInterval(() => this.performanceCleanup(), 300000);
     
     // Enhanced anti-loop protection
     this.pendingRequests = new Set();
     this.requestCounts = new Map();
-    this.maxRequestsPerSecond = 2; // Encore plus strict
+    this.maxRequestsPerSecond = 2;
     this.requestCooldowns = new Map();
     this.globalRequestBlacklist = new Set();
     
     // Protection contre les events en cascade
     this.eventCallStack = [];
-    this.maxCallStackDepth = 2; // Plus strict
+    this.maxCallStackDepth = 2;
     this.recursionProtection = new Map();
     
     // Performance monitoring
     this.listenerExecutionTimes = new Map();
     this.slowListeners = new Set();
-    
-    if (this.debugMode) {
-      console.log('[EVENTS] EventMediator v2.0.0 initialized with enhanced protection');
-    }
   }
 
   // === FUNCTION FINGERPRINTING FOR DUPLICATE DETECTION ===
@@ -112,7 +108,7 @@ export class EventMediator {
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash & hash;
     }
     return hash.toString(36);
   }
@@ -123,7 +119,6 @@ export class EventMediator {
     
     const { priority = 0, once = false, context = null } = options;
     
-    // Generate fingerprint to detect duplicates
     const fingerprint = this.getFunctionFingerprint(callback);
     const fingerprintKey = `${event}:${fingerprint}`;
     
@@ -133,7 +128,6 @@ export class EventMediator {
     
     const listeners = this.listeners.get(event);
     
-    // STRICT protection against duplicate listeners
     const existingByCallback = listeners.findIndex(l => l.callback === callback);
     const existingByFingerprint = listeners.findIndex(l => l.fingerprint === fingerprint);
     
@@ -147,13 +141,11 @@ export class EventMediator {
       return listeners[existingByFingerprint].id;
     }
     
-    // Check if fingerprint exists globally
     if (this.listenerFingerprints.has(fingerprintKey)) {
       console.warn(`[EVENTS] Global duplicate listener blocked: ${event}`);
       return this.listenerFingerprints.get(fingerprintKey);
     }
     
-    // Protection against listener overflow
     if (listeners.length >= this.maxListeners) {
       console.warn(`[EVENTS] Max listeners (${this.maxListeners}) exceeded for event: ${event}`);
       this._emergencyCleanupListeners(event);
@@ -177,7 +169,6 @@ export class EventMediator {
       avgExecutionTime: 0
     };
     
-    // Insert by priority
     const insertIndex = listeners.findIndex(l => l.priority < priority);
     if (insertIndex === -1) {
       listeners.push(listenerData);
@@ -185,12 +176,7 @@ export class EventMediator {
       listeners.splice(insertIndex, 0, listenerData);
     }
     
-    // Track globally
     this.listenerFingerprints.set(fingerprintKey, listenerData.id);
-    
-    if (this.debugMode) {
-      console.log(`[EVENTS] Listener added: ${event} (priority: ${priority}, total: ${listeners.length}, id: ${listenerData.id})`);
-    }
     
     return listenerData.id;
   }
@@ -198,7 +184,7 @@ export class EventMediator {
   once(event, callback, options = {}) {
     if (!this._validateEvent(event, callback)) return false;
     
-    const { timeout = 2000 } = options; // Réduit de 3000 à 2000ms
+    const { timeout = 2000 } = options;
     const listenerId = this._generateId();
     
     const wrappedCallback = (...args) => {
@@ -217,9 +203,6 @@ export class EventMediator {
       setTimeout(() => {
         if (this.listeners.has(event)) {
           this.off(event, id);
-          if (this.debugMode) {
-            console.log(`[EVENTS] Once listener timed out: ${event}`);
-          }
         }
       }, timeout);
     }
@@ -230,17 +213,14 @@ export class EventMediator {
   emit(event, data = null, options = {}) {
     const { async = false, validateData = false } = options;
     
-    // ENHANCED protection against infinite loops
     if (this.eventCallStack.length > this.maxCallStackDepth) {
       console.warn(`[EVENTS] Max call stack depth (${this.maxCallStackDepth}) exceeded for event: ${event}`);
       return false;
     }
     
-    // Check for recursive calls
-    const recursionKey = `${event}:${Date.now()}`;
     if (this.recursionProtection.has(event)) {
       const lastCall = this.recursionProtection.get(event);
-      if (Date.now() - lastCall < 100) { // 100ms recursion window
+      if (Date.now() - lastCall < 100) {
         console.warn(`[EVENTS] Recursion protection triggered for: ${event}`);
         return false;
       }
@@ -250,30 +230,22 @@ export class EventMediator {
     this.eventCallStack.push(event);
     
     try {
-      // Enhanced protection for WALLET_INFO_REQUEST
       if (event === EVENTS.WALLET_INFO_REQUEST) {
         const now = Date.now();
         
-        // Check blacklist
         if (this.globalRequestBlacklist.has(event)) {
-          console.log(`[EVENTS] Event blacklisted: ${event}`);
           return false;
         }
         
-        // Check cooldown
         if (this.requestCooldowns.has(event)) {
           const lastRequest = this.requestCooldowns.get(event);
-          if (now - lastRequest < 500) { // Increased cooldown to 500ms
-            if (this.debugMode) {
-              console.log(`[EVENTS] Request in cooldown: ${event}`);
-            }
+          if (now - lastRequest < 500) {
             return false;
           }
         }
         
         this.requestCooldowns.set(event, now);
         
-        // Rate limiting
         const requests = this.requestCounts.get(event) || [];
         const recentRequests = requests.filter(time => now - time < 1000);
         
@@ -282,7 +254,6 @@ export class EventMediator {
           this.globalRequestBlacklist.add(event);
           setTimeout(() => {
             this.globalRequestBlacklist.delete(event);
-            console.log(`[EVENTS] Event removed from blacklist: ${event}`);
           }, 5000);
           return false;
         }
@@ -304,16 +275,12 @@ export class EventMediator {
           async
         });
         
-        if (this.eventHistory.length > 30) { // Réduit de 50 à 30
+        if (this.eventHistory.length > 30) {
           this.eventHistory.shift();
         }
       }
       
       const listeners = this.listeners.get(event) || [];
-      
-      if (this.debugMode && event === EVENTS.WALLET_INFO_REQUEST) {
-        console.log(`[EVENTS] Emitting: ${event} to ${listeners.length} listeners`);
-      }
       
       if (!listeners.length) {
         return true;
@@ -338,7 +305,6 @@ export class EventMediator {
     } finally {
       this.eventCallStack.pop();
       
-      // Clean recursion protection after a delay
       setTimeout(() => {
         this.recursionProtection.delete(event);
       }, 200);
@@ -355,7 +321,6 @@ export class EventMediator {
       const listener = listeners[i];
       
       if (typeof callbackOrId === 'string' && listener.id === callbackOrId) {
-        // Remove from global tracking
         const fingerprintKey = `${event}:${listener.fingerprint}`;
         this.listenerFingerprints.delete(fingerprintKey);
         
@@ -363,7 +328,6 @@ export class EventMediator {
         removed = true;
         break;
       } else if (typeof callbackOrId === 'function' && listener.callback === callbackOrId) {
-        // Remove from global tracking
         const fingerprintKey = `${event}:${listener.fingerprint}`;
         this.listenerFingerprints.delete(fingerprintKey);
         
@@ -376,10 +340,6 @@ export class EventMediator {
       this.listeners.delete(event);
     }
     
-    if (this.debugMode && removed) {
-      console.log(`[EVENTS] Listener removed: ${event}`);
-    }
-    
     return removed;
   }
 
@@ -387,7 +347,6 @@ export class EventMediator {
     if (this.listeners.has(event)) {
       const listeners = this.listeners.get(event);
       
-      // Remove from global tracking
       listeners.forEach(listener => {
         const fingerprintKey = `${event}:${listener.fingerprint}`;
         this.listenerFingerprints.delete(fingerprintKey);
@@ -395,10 +354,6 @@ export class EventMediator {
       
       const count = listeners.length;
       this.listeners.delete(event);
-      
-      if (this.debugMode) {
-        console.log(`[EVENTS] All ${count} listeners removed for event: ${event}`);
-      }
     }
   }
 
@@ -407,19 +362,16 @@ export class EventMediator {
     const listeners = this.listeners.get(event) || [];
     const now = Date.now();
     
-    // Remove very old listeners (> 1 minute)
     const activeListeners = listeners.filter(listener => {
       const age = now - listener.created;
       return age <= 60000;
     });
     
-    // If still too many, keep only the most recently used
     if (activeListeners.length >= this.maxListeners) {
       activeListeners.sort((a, b) => b.lastExecuted - a.lastExecuted);
-      activeListeners.splice(Math.floor(this.maxListeners * 0.6)); // Keep 60% of limit
+      activeListeners.splice(Math.floor(this.maxListeners * 0.6));
     }
     
-    // Update global tracking
     listeners.forEach(listener => {
       const fingerprintKey = `${event}:${listener.fingerprint}`;
       this.listenerFingerprints.delete(fingerprintKey);
@@ -431,12 +383,10 @@ export class EventMediator {
     });
     
     this.listeners.set(event, activeListeners);
-    console.log(`[EVENTS] Emergency cleanup for ${event}: ${listeners.length} -> ${activeListeners.length}`);
   }
 
   // === PERFORMANCE MONITORING ===
   _executeListeners(listeners, eventContext) {
-    // Copy to prevent modifications during execution
     const listenersToExecute = [...listeners];
     
     listenersToExecute.forEach((listener, index) => {
@@ -445,25 +395,21 @@ export class EventMediator {
       try {
         listener.callback(eventContext.data, eventContext);
         
-        // Update performance stats
         const executionTime = performance.now() - startTime;
         listener.executionCount++;
         listener.lastExecuted = Date.now();
         listener.avgExecutionTime = (listener.avgExecutionTime + executionTime) / 2;
         
-        // Track slow listeners
-        if (executionTime > 100) { // 100ms threshold
+        if (executionTime > 100) {
           this.slowListeners.add(listener.id);
           console.warn(`[EVENTS] Slow listener detected: ${eventContext.event} (${executionTime.toFixed(2)}ms)`);
         }
         
-        // Remove "once" listeners
         if (listener.once) {
           const originalListeners = this.listeners.get(eventContext.event);
           if (originalListeners) {
             const listenerIndex = originalListeners.findIndex(l => l.id === listener.id);
             if (listenerIndex !== -1) {
-              // Remove from global tracking
               const fingerprintKey = `${eventContext.event}:${listener.fingerprint}`;
               this.listenerFingerprints.delete(fingerprintKey);
               
@@ -484,18 +430,17 @@ export class EventMediator {
   // === ENHANCED CLEANUP METHODS ===
   cleanup() {
     const now = Date.now();
-    const maxAge = 900000; // Réduit de 1800000 (30min) à 900000 (15min)
+    const maxAge = 900000;
     
     for (const [event, listeners] of this.listeners.entries()) {
       const filteredListeners = listeners.filter(listener => {
         const age = now - listener.created;
         const isActive = age <= maxAge && listener.executionCount > 0;
-        const isRecent = age <= 30000; // Keep very recent listeners
+        const isRecent = age <= 30000;
         
         return isActive || isRecent;
       });
       
-      // Update global tracking for removed listeners
       const removedListeners = listeners.filter(l => !filteredListeners.includes(l));
       removedListeners.forEach(listener => {
         const fingerprintKey = `${event}:${listener.fingerprint}`;
@@ -509,14 +454,12 @@ export class EventMediator {
       }
     }
     
-    // Clean history
     if (this.eventHistory) {
       this.eventHistory = this.eventHistory.filter(entry => {
         return (now - entry.timestamp) < maxAge;
       });
     }
     
-    // Clean request tracking
     for (const [event, requests] of this.requestCounts.entries()) {
       const recentRequests = requests.filter(time => now - time < 5000);
       if (recentRequests.length === 0) {
@@ -526,27 +469,21 @@ export class EventMediator {
       }
     }
     
-    // Clean cooldowns
     for (const [event, lastRequest] of this.requestCooldowns.entries()) {
       if (now - lastRequest > 10000) {
         this.requestCooldowns.delete(event);
       }
     }
-    
-    if (this.debugMode) {
-      console.log(`[EVENTS] Cleanup completed - Events: ${this.listeners.size}, Fingerprints: ${this.listenerFingerprints.size}`);
-    }
   }
 
   performanceCleanup() {
-    // Remove slow listeners that haven't improved
     for (const listenerId of this.slowListeners) {
       let found = false;
       for (const [event, listeners] of this.listeners.entries()) {
         const listenerIndex = listeners.findIndex(l => l.id === listenerId);
         if (listenerIndex !== -1) {
           const listener = listeners[listenerIndex];
-          if (listener.avgExecutionTime > 50) { // Still slow
+          if (listener.avgExecutionTime > 50) {
             console.warn(`[EVENTS] Removing persistently slow listener: ${event}`);
             this.off(event, listenerId);
           }
@@ -558,8 +495,6 @@ export class EventMediator {
         this.slowListeners.delete(listenerId);
       }
     }
-    
-    console.log(`[EVENTS] Performance cleanup completed`);
   }
 
   // === UTILITY METHODS ===
@@ -588,7 +523,6 @@ export class EventMediator {
   }
 
   destroy() {
-    // Clear all timers
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
@@ -599,7 +533,6 @@ export class EventMediator {
       this.performanceTimer = null;
     }
     
-    // Clear all data structures
     this.listeners.clear();
     this.listenerFingerprints.clear();
     this.requestCounts.clear();
@@ -660,7 +593,7 @@ export class EventMediator {
 // === GLOBAL EVENT BUS INSTANCE ===
 export const eventBus = new EventMediator({
   debug: false,
-  maxListeners: 30, // Réduit encore plus
+  maxListeners: 30,
   keepHistory: false
 });
 
@@ -700,7 +633,7 @@ export const waitForEvent = (event, condition = null, timeout = 2000) => {
   });
 };
 
-// === CROSS-MODULE COMMUNICATION HELPERS - ENHANCED ===
+// === CROSS-MODULE COMMUNICATION HELPERS ===
 let walletInfoRequestInProgress = false;
 let lastWalletInfoResponse = { address: '', isReady: false };
 let walletInfoCooldown = 0;
@@ -710,24 +643,20 @@ const MAX_WALLET_INFO_REQUESTS_PER_MINUTE = 10;
 export const requestWalletInfo = () => {
   const now = Date.now();
   
-  // Enhanced cooldown de 1 seconde
   if (now - walletInfoCooldown < 1000) {
     return Promise.resolve(lastWalletInfoResponse);
   }
   
-  // Rate limiting par minute
   walletInfoRequestCount++;
   if (walletInfoRequestCount > MAX_WALLET_INFO_REQUESTS_PER_MINUTE) {
     console.warn('[EVENTS] Wallet info request rate limit exceeded');
     return Promise.resolve(lastWalletInfoResponse);
   }
   
-  // Reset counter every minute
   setTimeout(() => {
     walletInfoRequestCount = Math.max(0, walletInfoRequestCount - 1);
   }, 60000);
   
-  // Éviter les requêtes multiples simultanées
   if (walletInfoRequestInProgress) {
     return Promise.resolve(lastWalletInfoResponse);
   }
@@ -735,7 +664,7 @@ export const requestWalletInfo = () => {
   walletInfoRequestInProgress = true;
   walletInfoCooldown = now;
   
-  return createEventPromise(EVENTS.WALLET_INFO_RESPONSE, 800) // Réduit à 800ms
+  return createEventPromise(EVENTS.WALLET_INFO_RESPONSE, 800)
     .then((result) => {
       lastWalletInfoResponse = result || { address: '', isReady: false };
       return lastWalletInfoResponse;
@@ -745,12 +674,11 @@ export const requestWalletInfo = () => {
     })
     .finally(() => {
       walletInfoRequestInProgress = false;
-      // Émettre la requête seulement si pas déjà en cours
       setTimeout(() => {
         if (!walletInfoRequestInProgress) {
           eventBus.emit(EVENTS.WALLET_INFO_REQUEST);
         }
-      }, 50); // Réduit de 10ms à 50ms
+      }, 50);
     });
 };
 
@@ -761,13 +689,10 @@ export const armSecurityTimer = () => {
 // === ENHANCED PAGE UNLOAD CLEANUP ===
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    console.log('[EVENTS] Page unloading - destroying event system');
     eventBus.destroy();
   });
   
-  // Also handle page hide for mobile
   window.addEventListener('pagehide', () => {
-    console.log('[EVENTS] Page hiding - cleaning up event system');
     eventBus.cleanup();
   });
 }
@@ -776,8 +701,6 @@ if (typeof window !== 'undefined') {
 if (typeof window !== 'undefined') {
   window.eventBus = eventBus;
   window.EVENTS = EVENTS;
-  
-  // Debug helper
   window.getEventStats = () => eventBus.getStats();
 }
 
