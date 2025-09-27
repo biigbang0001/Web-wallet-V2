@@ -25,14 +25,12 @@ function addUniqueEventListener(elementId, eventType, handler, options = {}) {
 
   const key = `${elementId}:${eventType}`;
   
-  // Remove existing handler if present
   if (handlerRegistry.has(key)) {
     const oldHandler = handlerRegistry.get(key);
     element.removeEventListener(eventType, oldHandler);
     handlerRegistry.delete(key);
   }
 
-  // Add new handler
   element.addEventListener(eventType, handler, options);
   handlerRegistry.set(key, handler);
   
@@ -74,7 +72,7 @@ function endOperation(operationType) {
   }
 }
 
-// === LOADING SYSTEM WITH i18n ===
+// === LOADING SYSTEM ===
 function showLoadingSpinner(show) {
   const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
   if (spinner) {
@@ -140,7 +138,6 @@ function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
       </div>
     `;
     
-    // Ajouter l'animation CSS si elle n'existe pas
     if (!document.querySelector('#loading-bar-style')) {
       const style = document.createElement('style');
       style.id = 'loading-bar-style';
@@ -185,7 +182,6 @@ function setButtonLoading(buttonId, loading, originalText = null) {
     if (text) {
       button.textContent = text;
     } else {
-      // Fallback avec i18n
       const refreshText = t('import_section.refresh_button', '🔄 Actualiser');
       button.textContent = refreshText;
     }
@@ -195,9 +191,9 @@ function setButtonLoading(buttonId, loading, originalText = null) {
   }
 }
 
+// === BALANCE FUNCTIONS ===
 async function updateBalance() {
   try {
-    // ⚠️ CORRECTION: Réinitialiser le timer à chaque interaction de balance
     armInactivityTimerSafely();
     
     if (window.getTotalBalance) {
@@ -212,15 +208,13 @@ async function updateBalance() {
   }
 }
 
-async function updateBalanceWithLoading() {
+async function updateBalanceWithForceRefresh() {
   if (isOperationActive('balance-update')) {
     console.log('[UI] Balance update already in progress');
     return;
   }
   
-  // ⚠️ CORRECTION: Réinitialiser le timer lors des opérations de balance
   armInactivityTimerSafely();
-  
   startOperation('balance-update');
   
   if (window.showBalanceLoadingSpinner) {
@@ -228,29 +222,29 @@ async function updateBalanceWithLoading() {
   }
   
   try {
-    // Nettoyer les caches blockchain pour forcer une vraie mise à jour
-    // ⚠️ CORRECTION: Ne pas déclencher d'événements de sécurité pendant le nettoyage normal
     if (window.clearBlockchainCaches) {
       const maybePromise = window.clearBlockchainCaches();
       if (maybePromise && typeof maybePromise.then === 'function') {
         await maybePromise;
       }
+      console.log('[REFRESH] Caches cleared for manual refresh');
     }
     
-    // Attendre un peu pour que le nettoyage prenne effet
     await new Promise(r => setTimeout(r, 500));
     
-    // Mise à jour des soldes - ÉVITER LE DOUBLE REFRESH
+    if (window.showBalanceLoadingSpinner) {
+      window.showBalanceLoadingSpinner(true, 'loading.utxo_scan');
+    }
+    
     if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
       await window.updateSendTabBalance();
     }
     
     await updateBalance();
     
-    // Animation de succès
     if (window.showBalanceLoadingSpinner) {
       window.showBalanceLoadingSpinner(true, 'loading.balance_updated');
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1200));
     }
     
   } catch (error) {
@@ -268,7 +262,6 @@ async function updateBalanceWithLoading() {
 }
 
 async function showSuccessPopup(txid) {
-  // ⚠️ CORRECTION: Réinitialiser le timer lors des pop-ups de succès
   armInactivityTimerSafely();
   
   if (window.showSuccessPopup) {
@@ -282,6 +275,7 @@ async function showSuccessPopup(txid) {
   }
 }
 
+// === UI HELPER FUNCTIONS ===
 function hideAllAuthForms() {
   const emailForm = document.getElementById('emailForm');
   const keyForm = document.getElementById('keyForm');
@@ -308,7 +302,6 @@ function clearInputFields() {
 }
 
 function displayWalletInfo(addresses, importType) {
-  // ⚠️ CORRECTION: Réinitialiser le timer lors de l'affichage des infos wallet
   armInactivityTimerSafely();
   
   const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
@@ -336,7 +329,6 @@ function displayWalletInfo(addresses, importType) {
     }
   }
   
-  // Log des adresses comme demandé
   if (FEATURE_FLAGS.LOG_ADDRESSES) {
     console.log('=== WALLET ADDRESSES ===');
     console.log('Bech32:', addresses.bech32);
@@ -346,9 +338,8 @@ function displayWalletInfo(addresses, importType) {
     console.log('========================');
   }
   
-  // Mise à jour du solde avec animation de chargement
   setTimeout(() => {
-    updateBalanceWithLoading();
+    updateBalance();
   }, 1000);
   
   injectConsolidateButton();
@@ -371,7 +362,6 @@ function injectConsolidateButton() {
     consolidateButton.style.marginTop = '10px';
     
     consolidateButton.addEventListener('click', async () => {
-      // ⚠️ CORRECTION: Réinitialiser le timer lors des clics sur consolidation
       armInactivityTimerSafely();
       
       if (isOperationActive('consolidation')) {
@@ -381,7 +371,7 @@ function injectConsolidateButton() {
       
       if (window.consolidateUtxos) {
         await window.consolidateUtxos();
-        setTimeout(() => updateBalanceWithLoading(), 3000);
+        setTimeout(() => updateBalance(), 3000);
       } else {
         const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
         alert(errorMsg);
@@ -392,7 +382,7 @@ function injectConsolidateButton() {
   }
 }
 
-// === SECURE SEED COPY SYSTEM WITH i18n ===
+// === SECURE SEED COPY SYSTEM ===
 function createSecureSeedButton(mnemonic, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -401,7 +391,6 @@ function createSecureSeedButton(mnemonic, containerId) {
     ? window.i18next.t 
     : (key, fallback) => fallback || key;
 
-  // Remove existing seed button if any
   const existingSeedButton = document.getElementById(ELEMENT_IDS.EMAIL_SEED_BUTTON);
   if (existingSeedButton) {
     existingSeedButton.remove();
@@ -418,13 +407,9 @@ function createSecureSeedButton(mnemonic, containerId) {
   let revealTimeout = null;
 
   seedButton.addEventListener('click', () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la révélation de seed
     armInactivityTimerSafely();
     
     if (!isRevealed) {
-      // Révéler la seed
-      
-      // Créer un élément temporaire pour afficher la seed
       const seedDisplay = document.createElement('div');
       seedDisplay.id = 'tempSeedDisplay';
       seedDisplay.style.cssText = `
@@ -454,9 +439,7 @@ function createSecureSeedButton(mnemonic, containerId) {
 
       container.appendChild(seedDisplay);
 
-      // Bouton de copie
       document.getElementById('copySeedBtn').addEventListener('click', () => {
-        // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
         armInactivityTimerSafely();
         
         if (navigator.clipboard && window.isSecureContext) {
@@ -464,7 +447,6 @@ function createSecureSeedButton(mnemonic, containerId) {
             const successMsg = t('seed_reveal.copy_success', 'Phrase mnémotechnique copiée dans le presse-papiers !');
             alert(successMsg);
           }).catch(() => {
-            // Fallback
             const textArea = document.createElement('textarea');
             textArea.value = mnemonic;
             textArea.style.position = 'fixed';
@@ -480,17 +462,14 @@ function createSecureSeedButton(mnemonic, containerId) {
         }
       });
 
-      // Changer le bouton principal
       seedButton.textContent = t('seed_reveal.button_hide', '🔒 Masquer la phrase');
       isRevealed = true;
 
-      // Auto-masquer après 30 secondes
       revealTimeout = setTimeout(() => {
         hideSeed();
       }, 30000);
 
     } else {
-      // Masquer la seed
       hideSeed();
     }
   });
@@ -518,7 +497,6 @@ function setupGenerationHandlers() {
   console.log('[UI] Setting up generation handlers...');
   
   addUniqueEventListener(ELEMENT_IDS.GENERATE_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la génération
     armInactivityTimerSafely();
     
     if (isOperationActive('generation')) {
@@ -535,7 +513,6 @@ function setupGenerationHandlers() {
       showLoadingSpinner(true);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, true);
       
-      // ⚠️ IMPORTANT: Démarrer le timer d'inactivité seulement lors de la génération
       armInactivityTimerSafely();
 
       if (window.hdManager) {
@@ -581,13 +558,11 @@ function setupGenerationHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_HD_KEY, 'click', () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
     armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.HD_MASTER_KEY);
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_MNEMONIC, 'click', () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
     armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.MNEMONIC_PHRASE);
   });
@@ -600,7 +575,6 @@ function setupImportHandlers() {
   console.log('[UI] Setting up import handlers...');
   
   addUniqueEventListener(ELEMENT_IDS.IMPORT_WALLET_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de l'import
     armInactivityTimerSafely();
     
     if (isOperationActive('import')) {
@@ -651,7 +625,6 @@ function setupImportHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la connexion email
     armInactivityTimerSafely();
     
     if (isOperationActive('email-connect')) {
@@ -689,7 +662,6 @@ function setupImportHandlers() {
         hideAllAuthForms();
         clearInputFields();
 
-        // Créer le bouton sécurisé de copie de seed
         if (result.mnemonic) {
           createSecureSeedButton(result.mnemonic, 'emailForm');
         }
@@ -714,14 +686,12 @@ function setupImportHandlers() {
     }
   });
 
-  // Boutons de rafraîchissement standardisés avec déduplication
   addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors du refresh
     armInactivityTimerSafely();
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
-      await updateBalanceWithLoading();
+      await updateBalanceWithForceRefresh();
     } catch (error) {
       console.error('[UI] Refresh balance error:', error);
     } finally {
@@ -743,7 +713,6 @@ function setupAuthenticationSystem() {
 
   if (tabEmail && tabKey && emailForm && keyForm) {
     addUniqueEventListener('tabEmail', 'click', () => {
-      // ⚠️ CORRECTION: Réinitialiser le timer lors du changement d'onglet
       armInactivityTimerSafely();
       
       tabEmail.classList.add('active');
@@ -758,7 +727,6 @@ function setupAuthenticationSystem() {
     });
     
     addUniqueEventListener('tabKey', 'click', () => {
-      // ⚠️ CORRECTION: Réinitialiser le timer lors du changement d'onglet
       armInactivityTimerSafely();
       
       tabKey.classList.add('active');
@@ -776,7 +744,7 @@ function setupAuthenticationSystem() {
   console.log('[UI] Authentication system setup completed');
 }
 
-// === ENHANCED TRANSACTION HANDLERS ===
+// === TRANSACTION HANDLERS ===
 function setupTransactionHandlers() {
   console.log('[UI] Setting up transaction handlers...');
   
@@ -785,7 +753,6 @@ function setupTransactionHandlers() {
     : (key, fallback) => fallback || key;
     
   addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors du clic MAX
     armInactivityTimerSafely();
     
     try {
@@ -806,7 +773,6 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la préparation de transaction
     armInactivityTimerSafely();
     
     if (isOperationActive('transaction')) {
@@ -833,10 +799,9 @@ function setupTransactionHandlers() {
         throw new Error(errorMsg);
       }
       
-      // Validation renforcée pour montants élevés
       if (window.getTotalBalance) {
         const totalBal = await window.getTotalBalance();
-        const feeReserve = 0.0005; // Reserve plus élevée pour les fees
+        const feeReserve = 0.0005;
         
         if (amount > (totalBal - feeReserve)) {
           const errorMsg = getTranslation('errors.amount_too_high', 
@@ -867,7 +832,6 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.BROADCAST_TX_BUTTON, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la diffusion
     armInactivityTimerSafely();
     
     if (isOperationActive('broadcast')) {
@@ -896,15 +860,13 @@ function setupTransactionHandlers() {
       
       await showSuccessPopup(txid);
       
-      // Clear form
       document.getElementById(ELEMENT_IDS.DESTINATION_ADDRESS).value = '';
       document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = '';
       document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
       
-      // Update balance after successful transaction
-      setTimeout(() => updateBalanceWithLoading(), 2000);
+      setTimeout(() => updateBalance(), 2000);
       
       console.log('[UI] Transaction broadcast successfully:', txid);
     } catch (error) {
@@ -919,7 +881,6 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.CANCEL_TX_BUTTON, 'click', () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de l'annulation
     armInactivityTimerSafely();
     
     document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
@@ -929,20 +890,16 @@ function setupTransactionHandlers() {
   });
 
   addUniqueEventListener(ELEMENT_IDS.COPY_TX_HEX, 'click', () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors de la copie
     armInactivityTimerSafely();
     copyToClipboard(ELEMENT_IDS.SIGNED_TX);
   });
 
-  // Bouton de rafraîchissement standardisé dans l'onglet Envoyer avec déduplication
   addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
-    // ⚠️ CORRECTION: Réinitialiser le timer lors du refresh de l'onglet envoi
     armInactivityTimerSafely();
     
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
-      await updateBalanceWithLoading();
-      // Aussi mettre à jour le solde spécifique de l'onglet envoi
+      await updateBalanceWithForceRefresh();
       if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
         await window.updateSendTabBalance();
       }
@@ -996,7 +953,7 @@ export function cleanupUIHandlers() {
   console.log('[UI] All event handlers cleaned up');
 }
 
-// === AUTO-INITIALIZATION WITH BETTER TIMING ===
+// === AUTO-INITIALIZATION ===
 function initializeWhenReady() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1007,14 +964,12 @@ function initializeWhenReady() {
   }
 }
 
-// === RE-SETUP ON LANGUAGE CHANGE ===
+// === LANGUAGE CHANGE LISTENER ===
 if (typeof window !== 'undefined') {
-  // Listen for language change events
   if (window.i18next && typeof window.i18next.on === 'function') {
     window.i18next.on('languageChanged', () => {
       console.log('[UI] Language changed, refreshing handlers...');
       setTimeout(() => {
-        // Re-apply button labels without removing handlers
         const buttons = document.querySelectorAll('button[data-i18n]');
         buttons.forEach(btn => {
           const key = btn.getAttribute('data-i18n');
@@ -1030,7 +985,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Initialize
 initializeWhenReady();
 
 // === GLOBAL ACCESS ===
@@ -1038,7 +992,7 @@ if (typeof window !== 'undefined') {
   window.setupUIHandlers = setupUIHandlers;
   window.cleanupUIHandlers = cleanupUIHandlers;
   window.updateBalance = updateBalance;
-  window.updateBalanceWithLoading = updateBalanceWithLoading;
+  window.updateBalanceWithForceRefresh = updateBalanceWithForceRefresh;
   window.showConnectionLoadingSpinner = showConnectionLoadingSpinner;
   window.addUniqueEventListener = addUniqueEventListener;
   window.removeEventListener = removeEventListener;
