@@ -301,15 +301,9 @@ export class SimpleTransactionBuilder {
   }
 
   async signTxWithPSBT(to, amt, isConsolidation = false) {
-    if (isOperationActive('transaction')) {
-      console.log('[TX] Transaction already in progress');
-      throw new Error('Transaction déjà en cours. Veuillez attendre.');
-    }
-
-    startOperation('transaction');
-    armInactivityTimerSafely();
+armInactivityTimerSafely();
     
-    try {
+    
       const walletInfo = await getWalletInfo();
       if (!walletInfo.isReady) {
         const errorMsg = getTranslation('errors.import_first', 'Importez d\'abord un wallet.');
@@ -436,10 +430,7 @@ export class SimpleTransactionBuilder {
       }
 
       return await this.buildAndSignTransaction(to, target, selectedUtxos, isConsolidation, selectedAddressType);
-    } finally {
-      endOperation('transaction');
-    }
-  }
+}
 
   async buildAndSignTransaction(to, target, selectedUtxos, isConsolidation, sourceAddressType) {
     const { bitcoin } = await getBitcoinLibraries();
