@@ -6,8 +6,8 @@ import { eventBus, EVENTS } from './events.js';
 
 // === TRANSLATION HELPER ===
 function getTranslation(key, fallback, params = {}) {
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
+  const t = (window.i18next && typeof window.i18next.t === 'function')
+    ? window.i18next.t
     : () => fallback || key;
   return t(key, { ...params, defaultValue: fallback });
 }
@@ -18,18 +18,18 @@ class TimerContext {
     this.context = null;
     this.callbacks = new Map();
   }
-  
+
   setContext(context, callback = null) {
     this.context = context;
     if (callback) {
       this.callbacks.set(context, callback);
     }
   }
-  
+
   clearContext() {
     this.context = null;
   }
-  
+
   executeCallback() {
     const callback = this.callbacks.get(this.context);
     if (callback && typeof callback === 'function') {
@@ -40,7 +40,7 @@ class TimerContext {
       }
     }
   }
-  
+
   hasContext(context) {
     return this.context === context;
   }
@@ -58,7 +58,7 @@ class SecureKeyManager {
     this.operationCheckTimer = null;
     this.lastClearReason = null;
     this.isInactivityActive = false; // Nouveau: track l'état du timer d'inactivité
-    
+
     this.setupAutoCleanup();
     this.setupPageHideCleanup();
     this.setupInactivityTimer();
@@ -112,18 +112,18 @@ class SecureKeyManager {
   async storeKey(id, keyData) {
     try {
       this.updateAccess();
-      
+
       if (this.encryptedData.size >= SECURITY_CONFIG.MAX_MEMORY_KEYS) {
         console.warn('Maximum key storage exceeded, clearing oldest keys');
         this.clearOldestKeys(1);
       }
-      
+
       const encrypted = await this.encrypt(keyData);
       this.encryptedData.set(id, {
         ...encrypted,
         timestamp: Date.now()
       });
-      
+
       console.log(`[SECURITY] Secure key stored: ${id}`);
     } catch (error) {
       console.error(`Failed to store key ${id}:`, error);
@@ -136,7 +136,7 @@ class SecureKeyManager {
       this.updateAccess();
       const encrypted = this.encryptedData.get(id);
       if (!encrypted) return null;
-      
+
       return await this.decrypt(encrypted);
     } catch (error) {
       console.error(`Failed to retrieve key ${id}:`, error);
@@ -152,7 +152,7 @@ class SecureKeyManager {
     const entries = Array.from(this.encryptedData.entries())
       .sort((a, b) => a[1].timestamp - b[1].timestamp)
       .slice(0, count);
-    
+
     entries.forEach(([id]) => {
       this.encryptedData.delete(id);
       console.log(`[SECURITY] Cleared old key: ${id}`);
@@ -170,7 +170,7 @@ class SecureKeyManager {
   // Amélioration: Méthode pour vérifier si on est dans une phase d'import/génération
   isWalletOperationInProgress() {
     if (typeof window !== 'undefined' && window.isOperationActive) {
-      return window.isOperationActive('import') || 
+      return window.isOperationActive('import') ||
              window.isOperationActive('wallet-import') ||
              window.isOperationActive('email-connect') ||
              window.isOperationActive('generation') ||
@@ -184,15 +184,15 @@ class SecureKeyManager {
     try {
       this.lastClearReason = reason;
       console.log(`[SECURITY] All secure keys cleared (reason: ${reason})`);
-      
+
       this.encryptedData.clear();
       this.sessionKey = null;
-      
+
       if (this.cleanupTimer) {
         clearTimeout(this.cleanupTimer);
         this.cleanupTimer = null;
       }
-      
+
       // CORRECTION: Ne pas arrêter le timer d'inactivité sauf pour les vrais timeouts
       if (reason === 'inactivity_timeout' || reason === 'session_timeout') {
         if (this.inactivityTimer) {
@@ -201,7 +201,7 @@ class SecureKeyManager {
         }
         this.isInactivityActive = false;
       }
-      
+
       if (this.displayTimer) {
         clearInterval(this.displayTimer);
         this.displayTimer = null;
@@ -211,9 +211,9 @@ class SecureKeyManager {
         clearInterval(this.operationCheckTimer);
         this.operationCheckTimer = null;
       }
-      
+
       eventBus.emit(EVENTS.KEYS_CLEARED, { reason });
-      
+
       // CORRECTION: Auto-reload seulement pour les vrais timeouts de sécurité
       const securityTimeouts = ['inactivity_timeout', 'session_timeout'];
       if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR && securityTimeouts.includes(reason)) {
@@ -222,7 +222,7 @@ class SecureKeyManager {
       } else {
         console.log(`[SECURITY] Keys cleared for reason: ${reason}, no auto-reload needed`);
       }
-      
+
     } catch (error) {
       console.error('Error clearing keys:', error);
     }
@@ -230,7 +230,7 @@ class SecureKeyManager {
 
   scheduleAutoReload() {
     console.log('[SECURITY] Scheduling auto-reload check...');
-    
+
     const checkAndReload = () => {
       // Vérification plus stricte des opérations
       if (this.isWalletOperationInProgress()) {
@@ -238,29 +238,29 @@ class SecureKeyManager {
         setTimeout(checkAndReload, 5000);
         return;
       }
-      
+
       if (this.isOperationInProgress()) {
         console.log('[SECURITY] General operation in progress, delaying auto-reload...');
         setTimeout(checkAndReload, 3000);
         return;
       }
-      
+
       this.executeAutoReload();
     };
-    
+
     // Attendre plus longtemps avant le premier check
     setTimeout(checkAndReload, 5000);
   }
 
   executeAutoReload() {
     console.log('[SECURITY] Executing auto-reload...');
-    
+
     // Vérification finale
     if (this.isWalletOperationInProgress()) {
       console.log('[SECURITY] Aborting auto-reload, wallet operation detected');
       return;
     }
-    
+
     // CORRECTION: Afficher une notification traduite avant le rechargement
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
@@ -274,10 +274,10 @@ class SecureKeyManager {
       justify-content: center;
       backdrop-filter: blur(10px);
     `;
-    
+
     const title = getTranslation('security.session_expired_title', 'Session expirée');
     const message = getTranslation('security.auto_reload_message', 'Rechargement automatique...');
-    
+
     overlay.innerHTML = `
       <div style="
         background: ${isDarkMode ? '#1a202c' : '#ffffff'};
@@ -293,9 +293,9 @@ class SecureKeyManager {
         <div style="opacity: 0.8;">${message}</div>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
-    
+
     setTimeout(() => {
       window.location.reload();
     }, 2000);
@@ -312,11 +312,10 @@ class SecureKeyManager {
   updateAccess() {
     const now = Date.now();
     this.lastAccess = now;
-    
+
     // CORRECTION: Réinitialiser complètement le timer d'inactivité
     this.resetInactivityTimer();
-    
-    console.log(`[SECURITY] Access updated, timer reset to 10 minutes`);
+
   }
 
   setupAutoCleanup() {
@@ -333,7 +332,7 @@ class SecureKeyManager {
       this.clearSensitiveDisplayOnly('page_unload');
       this.clearSensitiveFields();
     };
-    
+
     window.addEventListener('pagehide', cleanup);
     window.addEventListener('beforeunload', cleanup);
   }
@@ -351,23 +350,22 @@ class SecureKeyManager {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
     }
-    
+
     // CORRECTION: Créer un nouveau timer de 10 minutes exactement
     this.inactivityTimer = setTimeout(() => {
       console.log('[SECURITY] Inactivity timeout reached - clearing sensitive data');
       this.clearSensitiveData('inactivity_timeout');
       eventBus.emit(EVENTS.SESSION_EXPIRED, { reason: 'inactivity' });
     }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
-    
+
     this.isInactivityActive = true;
-    console.log(`[SECURITY] Inactivity timer reset - ${SECURITY_CONFIG.INACTIVITY_TIMEOUT / 60000} minutes`);
   }
 
   startTimerDisplay() {
     if (this.displayTimer) {
       clearInterval(this.displayTimer);
     }
-    
+
     this.displayTimer = setInterval(() => {
       this.updateTimerDisplay();
     }, 1000);
@@ -380,12 +378,12 @@ class SecureKeyManager {
     const now = Date.now();
     const elapsed = now - this.lastAccess;
     const remaining = Math.max(0, SECURITY_CONFIG.INACTIVITY_TIMEOUT - elapsed);
-    
+
     const minutes = Math.floor(remaining / 60000);
     const seconds = Math.floor((remaining % 60000) / 1000);
-    
+
     timerElement.textContent = `[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}]`;
-    
+
     // CORRECTION: Quand le timer atteint 0, déclencher le timeout
     if (remaining <= 0 && this.isInactivityActive) {
       clearInterval(this.displayTimer);
@@ -396,7 +394,7 @@ class SecureKeyManager {
   // CORRECTION: Distinction entre nettoyage d'affichage et nettoyage complet
   clearSensitiveData(reason = 'inactivity') {
     console.log(`[SECURITY] Clearing sensitive display data (reason: ${reason}), wallet keys preserved`);
-    
+
     const sensitiveElements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -415,7 +413,7 @@ class SecureKeyManager {
 
     // CORRECTION: Émettre l'événement avec la raison
     eventBus.emit(EVENTS.INACTIVITY_WARNING, { reason });
-    
+
     // CORRECTION: Pour les vrais timeouts d'inactivité, déclencher l'auto-reload
     if (reason === 'inactivity_timeout' && FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) {
       this.scheduleAutoReload();
@@ -425,7 +423,7 @@ class SecureKeyManager {
   // NOUVELLE MÉTHODE: Nettoyage d'affichage seulement (pour page unload)
   clearSensitiveDisplayOnly(reason = 'page_unload') {
     console.log(`[SECURITY] Clearing sensitive display only (reason: ${reason})`);
-    
+
     const sensitiveElements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -445,7 +443,7 @@ class SecureKeyManager {
 
   clearSensitiveFields() {
     const fieldsToKeep = new Set([ELEMENT_IDS.WALLET_ADDRESS]);
-    
+
     document.querySelectorAll('input[type="password"], input[type="text"], textarea').forEach(input => {
       if (!fieldsToKeep.has(input.id)) {
         input.value = '';
@@ -455,7 +453,6 @@ class SecureKeyManager {
 
   // CORRECTION: S'assurer que chaque action utilisateur réinitialise le timer
   updateLastActionTime() {
-    console.log('[SECURITY] User action detected - resetting inactivity timer');
     this.updateAccess();
   }
 }
@@ -464,12 +461,12 @@ class SecureKeyManager {
 export async function deriveFromCredentials(email, password, wordCount = 24) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    
+
     if (!validateInput(normalizedEmail, 'email')) {
       const errorMsg = getTranslation('errors.enter_email_password', 'Format d\'email invalide');
       throw new Error(errorMsg);
     }
-    
+
     if (!password || password.length < 1) {
       const errorMsg = getTranslation('errors.enter_email_password', 'Le mot de passe ne peut pas être vide');
       throw new Error(errorMsg);
@@ -477,7 +474,7 @@ export async function deriveFromCredentials(email, password, wordCount = 24) {
 
     const encoder = new TextEncoder();
     const salt = encoder.encode('nito-mnemonic:' + normalizedEmail);
-    
+
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       encoder.encode(password),
@@ -485,22 +482,22 @@ export async function deriveFromCredentials(email, password, wordCount = 24) {
       false,
       ['deriveBits']
     );
-    
+
     const bits = await crypto.subtle.deriveBits({
       name: 'PBKDF2',
       hash: 'SHA-512',
       salt,
       iterations: 200000
     }, keyMaterial, wordCount === 24 ? 256 : 128);
-    
+
     const entropy = Array.from(new Uint8Array(bits))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-    
+
     if (!window.bip39) {
       throw new Error('BIP39 library not available');
     }
-    
+
     return window.bip39.entropyToMnemonic(entropy);
   } catch (error) {
     console.error('Credential derivation failed:', error);
@@ -511,7 +508,7 @@ export async function deriveFromCredentials(email, password, wordCount = 24) {
 // === ENHANCED INPUT VALIDATION ===
 export function validateInput(input, type) {
   if (!input || typeof input !== 'string') return false;
-  
+
   const trimmed = input.trim();
   if (!trimmed) return false;
 
@@ -519,38 +516,38 @@ export function validateInput(input, type) {
     switch (type) {
       case 'wif':
         return VALIDATION_PATTERNS.WIF.test(trimmed);
-        
+
       case 'hex':
         return VALIDATION_PATTERNS.HEX_PRIVATE_KEY.test(trimmed);
-        
+
       case 'xprv':
         return VALIDATION_PATTERNS.XPRV.test(trimmed);
-        
+
       case 'address':
         return VALIDATION_PATTERNS.ADDRESS.test(trimmed);
-        
+
       case 'bech32':
         return VALIDATION_PATTERNS.BECH32_ADDRESS.test(trimmed);
-        
+
       case 'bech32m':
         return VALIDATION_PATTERNS.BECH32M_ADDRESS.test(trimmed);
-        
+
       case 'amount':
         return VALIDATION_PATTERNS.AMOUNT.test(trimmed) && parseFloat(trimmed) > 0;
-        
+
       case 'mnemonic':
         const words = trimmed.split(/\s+/);
         return [12, 15, 18, 21, 24].includes(words.length) && words.every(word => word.length > 0);
-        
+
       case 'txid':
         return VALIDATION_PATTERNS.TXID.test(trimmed);
-        
+
       case 'email':
         return VALIDATION_PATTERNS.EMAIL.test(trimmed);
-        
+
       case 'scriptHex':
         return VALIDATION_PATTERNS.SCRIPT_HEX.test(trimmed);
-        
+
       default:
         console.warn(`Unknown validation type: ${type}`);
         return false;
@@ -564,14 +561,14 @@ export function validateInput(input, type) {
 // === INPUT TYPE DETECTION ===
 export function detectInputType(input) {
   if (!input || typeof input !== 'string') return 'unknown';
-  
+
   const trimmed = input.trim();
-  
+
   if (validateInput(trimmed, 'xprv')) return 'xprv';
   if (validateInput(trimmed, 'mnemonic')) return 'mnemonic';
   if (validateInput(trimmed, 'wif')) return 'wif';
   if (validateInput(trimmed, 'hex')) return 'hex';
-  
+
   return 'unknown';
 }
 
@@ -580,31 +577,31 @@ class RateLimiter {
   constructor() {
     this.attempts = new Map();
   }
-  
+
   check(key, maxAttempts = SECURITY_CONFIG.RATE_LIMIT_ATTEMPTS, timeWindow = SECURITY_CONFIG.RATE_LIMIT_WINDOW) {
     const now = Date.now();
     const attempts = this.attempts.get(key) || [];
-    
+
     const recentAttempts = attempts.filter(time => now - time < timeWindow);
-    
+
     if (recentAttempts.length >= maxAttempts) {
       const oldestAttempt = Math.min(...recentAttempts);
       const waitTime = Math.ceil((timeWindow - (now - oldestAttempt)) / 1000);
-      const errorMsg = getTranslation('security.rate_limit_exceeded', 
+      const errorMsg = getTranslation('security.rate_limit_exceeded',
         `Limite de taux dépassée. Veuillez attendre ${waitTime} secondes avant de réessayer.`,
         { seconds: waitTime }
       );
       throw new Error(errorMsg);
     }
-    
+
     recentAttempts.push(now);
     this.attempts.set(key, recentAttempts);
-    
+
     if (this.attempts.size > 100) {
       this.cleanupOldAttempts(now, timeWindow);
     }
   }
-  
+
   cleanupOldAttempts(now, timeWindow) {
     for (const [key, attempts] of this.attempts) {
       const recentAttempts = attempts.filter(time => now - time < timeWindow);
@@ -647,7 +644,7 @@ export function copyToClipboard(elementId) {
       'privateKey',
       'privateKeyHex'
     ]);
-    
+
     if (sensitiveIds.has(elementId)) {
       armInactivityTimerSafely();
     }
@@ -679,7 +676,7 @@ export function copyToClipboard(elementId) {
     } else {
       fallbackCopy(text);
     }
-    
+
   } catch (error) {
     console.error('Copy error:', error);
     showCopyFeedback(false, error.message);
@@ -692,11 +689,11 @@ function fallbackCopy(text) {
   textArea.style.position = 'fixed';
   textArea.style.left = '-999999px';
   textArea.style.top = '-999999px';
-  
+
   document.body.appendChild(textArea);
   textArea.focus();
   textArea.select();
-  
+
   try {
     const successful = document.execCommand('copy');
     showCopyFeedback(successful);
@@ -710,10 +707,10 @@ function fallbackCopy(text) {
 }
 
 function showCopyFeedback(success, message = null) {
-  const text = success 
+  const text = success
     ? getTranslation('security.copied', 'Copié !')
     : (message || getTranslation('security.copy_failed', 'Échec de la copie'));
-    
+
   if (window.showNotification) {
     window.showNotification(text, success ? 'success' : 'error');
   } else {
@@ -726,30 +723,30 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
   try {
     const button = document.getElementById(buttonId);
     const target = document.getElementById(targetId);
-    
+
     if (!button) {
       console.warn(`Reveal button not found: ${buttonId}`);
       return false;
     }
-    
+
     if (!target) {
       console.warn(`Reveal target not found: ${targetId}`);
       return false;
     }
-    
+
     // Remove existing listeners to prevent duplicates
     const newButton = button.cloneNode(true);
     button.parentNode.replaceChild(newButton, button);
-    
+
     newButton.addEventListener('click', () => {
       try {
         armInactivityTimerSafely();
-        
+
         newButton.disabled = true;
         target.classList.remove('blurred');
-        
+
         console.log(`[SECURITY] Content revealed: ${targetId}`);
-        
+
         setTimeout(() => {
           target.classList.add('blurred');
           newButton.disabled = false;
@@ -760,7 +757,7 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
         newButton.disabled = false;
       }
     });
-    
+
     console.log(`[SECURITY] Reveal button setup completed: ${buttonId} -> ${targetId}`);
     return true;
   } catch (error) {
@@ -776,18 +773,18 @@ const timerContext = new TimerContext();
 export function armInactivityTimerSafely() {
   try {
     console.log('[SECURITY] armInactivityTimerSafely called - resetting timer');
-    
+
     if (timerContext.hasContext('generation')) {
       if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
         keyManager.updateLastActionTime();
       }
     }
-    
+
     // CORRECTION: Toujours réinitialiser le timer d'inactivité
     if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
       keyManager.updateLastActionTime();
     }
-    
+
     eventBus.emit(EVENTS.TIMER_ARM_REQUEST);
   } catch (error) {
     console.warn('Timer arm failed:', error);
@@ -819,11 +816,11 @@ eventBus.on(EVENTS.KEYS_CLEARED, (data) => {
 
 eventBus.on(EVENTS.SESSION_EXPIRED, (data) => {
   console.log('[SECURITY] Session expired event received:', data);
-  
+
   // CORRECTION: Afficher un avertissement traduit avant l'auto-reload
-  const warningMsg = getTranslation('security.session_timeout_warning', 
+  const warningMsg = getTranslation('security.session_timeout_warning',
     'Session expirée pour cause d\'inactivité. Le wallet va se recharger automatiquement.');
-  
+
   // Afficher une notification non-bloquante
   if (window.showNotification) {
     window.showNotification(warningMsg, 'warning');
@@ -841,12 +838,12 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
     setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
-    
+
     console.log('[SECURITY] Security layer initialized - Version 2.0.0');
   });
 } else {
   setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
   setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
-  
+
   console.log('[SECURITY] Security layer initialized - Version 2.0.0');
 }
