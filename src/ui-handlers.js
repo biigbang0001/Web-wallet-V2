@@ -4,14 +4,6 @@ import { ELEMENT_IDS, FEATURE_FLAGS } from './config.js';
 import { copyToClipboard, armInactivityTimerSafely } from './security.js';
 import { eventBus, EVENTS } from './events.js';
 
-// === TRANSLATION HELPER ===
-function getTranslation(key, fallback, params = {}) {
-  const t = (window.i18next && typeof window.i18next.t === 'function')
-    ? window.i18next.t
-    : () => fallback || key;
-  return t(key, { ...params, defaultValue: fallback });
-}
-
 // === EVENT HANDLER DEDUPLICATION ===
 const handlerRegistry = new Map();
 let setupComplete = false;
@@ -24,7 +16,7 @@ function addUniqueEventListener(elementId, eventType, handler, options = {}) {
   }
 
   const key = `${elementId}:${eventType}`;
-
+  
   if (handlerRegistry.has(key)) {
     const oldHandler = handlerRegistry.get(key);
     element.removeEventListener(eventType, oldHandler);
@@ -33,14 +25,14 @@ function addUniqueEventListener(elementId, eventType, handler, options = {}) {
 
   element.addEventListener(eventType, handler, options);
   handlerRegistry.set(key, handler);
-
+  
   return true;
 }
 
 function removeEventListener(elementId, eventType) {
   const element = document.getElementById(elementId);
   const key = `${elementId}:${eventType}`;
-
+  
   if (handlerRegistry.has(key)) {
     const handler = handlerRegistry.get(key);
     if (element) {
@@ -51,183 +43,12 @@ function removeEventListener(elementId, eventType) {
   }
 }
 
-// === OPERATION TRACKING ===
-function isOperationActive(operationType = null) {
-  if (window.isOperationActive) {
-    return window.isOperationActive(operationType);
-  }
-  return false;
-}
-
-function startOperation(operationType) {
-  if (window.startOperation) {
-    window.startOperation(operationType);
-  }
-}
-
-function endOperation(operationType) {
-  if (window.endOperation) {
-    window.endOperation(operationType);
-  }
-}
-
-// === LOADING SYSTEM WITH I18N ===
-function showLoadingSpinner(show) {
-  const spinner = document.getElementById(ELEMENT_IDS.LOADING_SPINNER);
-  if (spinner) {
-    spinner.style.display = show ? 'block' : 'none';
-  }
-}
-
-function showConnectionLoadingSpinner(show, messageKey = 'loading.connecting') {
-  let modal = document.getElementById('connectionLoadingModal');
-
-  if (show) {
-    if (isOperationActive('connection')) {
-      return;
-    }
-    startOperation('connection');
-
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'connectionLoadingModal';
-      modal.style.cssText = `
-        display: flex;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.4);
-        backdrop-filter: blur(6px);
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
-      `;
-
-      document.body.appendChild(modal);
-    }
-
-    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    const message = t(messageKey, 'Connexion en cours...');
-    const subtitle = t('loading.wallet_setup', 'Configuration du portefeuille...');
-
-    modal.innerHTML = `
-      <div style="
-        background: ${isDarkMode ? '#1a202c' : '#ffffff'};
-        color: ${isDarkMode ? '#e2e8f0' : '#111111'};
-        border: 1px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
-        padding: 2rem 2.5rem;
-        border-radius: 20px;
-        box-shadow: 0 15px 40px rgba(0,0,0,${isDarkMode ? '0.6' : '0.25'});
-        text-align: center;
-        min-width: 320px;
-        max-width: 90vw;
-        backdrop-filter: blur(15px);
-        border: 2px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};
-      ">
-        <div style="font-size:3rem; line-height:1; margin-bottom:1.2rem; animation: rotate 1.5s linear infinite;">🔐</div>
-        <div class="loading-text" style="font-weight:700; font-size: 20px; margin-bottom: 0.8rem; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">${message}</div>
-        <div style="font-size: 15px; opacity: 0.8; margin-bottom: 1rem;">${subtitle}</div>
-        <div style="width: 100%; background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 10px; height: 6px; overflow: hidden;">
-          <div style="width: 100%; height: 100%; background: linear-gradient(90deg, ${isDarkMode ? '#3b82f6' : '#2563eb'}, ${isDarkMode ? '#1e40af' : '#1d4ed8'}); border-radius: 10px; animation: loading-bar 2s ease-in-out infinite;"></div>
-        </div>
-      </div>
-    `;
-
-    if (!document.querySelector('#loading-bar-style')) {
-      const style = document.createElement('style');
-      style.id = 'loading-bar-style';
-      style.textContent = `
-        @keyframes loading-bar {
-          0%, 100% { transform: translateX(-100%); }
-          50% { transform: translateX(100%); }
-        }
-        @keyframes rotate {
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    modal.style.display = 'flex';
-  } else {
-    if (modal) {
-      modal.style.display = 'none';
-    }
-    endOperation('connection');
-  }
-}
-
-function showBalanceLoadingSpinner(show, messageKey = 'loading.balance_refresh') {
-  let modal = document.getElementById('balanceLoadingModal');
-
-  if (show) {
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'balanceLoadingModal';
-      modal.style.cssText = `
-        display: flex;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.4);
-        backdrop-filter: blur(6px);
-        z-index: 10000;
-        align-items: center;
-        justify-content: center;
-      `;
-
-      document.body.appendChild(modal);
-    }
-
-    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    const message = t(messageKey, 'Actualisation du solde…');
-    const subtitle = t('loading.blockchain_scan', 'Scan blockchain en cours...');
-
-    modal.innerHTML = `
-      <div style="
-        background: ${isDarkMode ? '#1a202c' : '#ffffff'};
-        color: ${isDarkMode ? '#e2e8f0' : '#111111'};
-        border: 1px solid ${isDarkMode ? '#4a5568' : '#e2e8f0'};
-        padding: 2rem 2.5rem;
-        border-radius: 20px;
-        box-shadow: 0 15px 40px rgba(0,0,0,${isDarkMode ? '0.6' : '0.25'});
-        text-align: center;
-        min-width: 320px;
-        max-width: 90vw;
-        backdrop-filter: blur(15px);
-        border: 2px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};
-      ">
-        <div style="font-size:3rem; line-height:1; margin-bottom:1.2rem; animation: rotate 1.5s linear infinite;">⌛</div>
-        <div class="loading-text" style="font-weight:700; font-size: 20px; margin-bottom: 0.8rem; color: ${isDarkMode ? '#60a5fa' : '#2563eb'};">${message}</div>
-        <div style="font-size: 15px; opacity: 0.8; margin-bottom: 1rem;">${subtitle}</div>
-        <div style="width: 100%; background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 10px; height: 6px; overflow: hidden;">
-          <div style="width: 100%; height: 100%; background: linear-gradient(90deg, ${isDarkMode ? '#3b82f6' : '#2563eb'}, ${isDarkMode ? '#1e40af' : '#1d4ed8'}); border-radius: 10px; animation: loading-bar 2s ease-in-out infinite;"></div>
-        </div>
-      </div>
-    `;
-
-    modal.style.display = 'flex';
-  } else {
-    if (modal) {
-      modal.style.display = 'none';
-    }
-  }
-}
-
 function setButtonLoading(buttonId, loading, originalText = null) {
   const button = document.getElementById(buttonId);
   if (!button) return;
-
-  const t = (window.i18next && typeof window.i18next.t === 'function')
-    ? window.i18next.t
-    : (key, fallback) => fallback || key;
-
+  
+  const t = window.getTranslation || ((key, fallback) => fallback || key);
+  
   if (loading) {
     if (!button.dataset.originalText) {
       button.dataset.originalText = button.textContent;
@@ -249,118 +70,12 @@ function setButtonLoading(buttonId, loading, originalText = null) {
   }
 }
 
-// === BALANCE UPDATE FUNCTIONS ===
-async function updateBalanceWithAnimation() {
-  if (isOperationActive('balance-update')) {
-    return;
-  }
-
-  armInactivityTimerSafely();
-  startOperation('balance-update');
-
-  if (window.showBalanceLoadingSpinner) {
-    window.showBalanceLoadingSpinner(true, 'loading.balance_refresh');
-  }
-
-  try {
-    if (typeof window.updateSendTabBalance === 'function' && !isOperationActive('balance-refresh')) {
-      await window.updateSendTabBalance();
-    }
-
-    if (window.getTotalBalance) {
-      const total = await window.getTotalBalance();
-      const balanceElement = document.getElementById('totalBalance');
-      if (balanceElement) {
-        balanceElement.textContent = total.toFixed(8) + ' NITO';
-      }
-    }
-
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(true, 'loading.balance_updated');
-      await new Promise(r => setTimeout(r, 1000));
-    }
-
-  } catch (error) {
-    console.error('[UI] Balance update error:', error);
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(true, 'loading.update_error');
-      await new Promise(r => setTimeout(r, 1500));
-    }
-  } finally {
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(false);
-    }
-    endOperation('balance-update');
-  }
-}
-
-async function updateBalanceWithCacheClear() {
-  if (isOperationActive('balance-refresh')) {
-    return;
-  }
-
-  armInactivityTimerSafely();
-  startOperation('balance-refresh');
-
-  showBalanceLoadingSpinner(true, 'loading.cache_clearing');
-
-  try {
-    if (window.clearBlockchainCaches) {
-      const maybePromise = window.clearBlockchainCaches();
-      if (maybePromise && typeof maybePromise.then === 'function') {
-        await maybePromise;
-      }
-    }
-
-    await new Promise(r => setTimeout(r, 800));
-    showBalanceLoadingSpinner(true, 'loading.utxo_scan');
-
-    if (typeof window.updateSendTabBalance === 'function') {
-      await window.updateSendTabBalance();
-    }
-
-    if (window.getTotalBalance) {
-      const total = await window.getTotalBalance();
-      const balanceElement = document.getElementById('totalBalance');
-      if (balanceElement) {
-        balanceElement.textContent = total.toFixed(8) + ' NITO';
-      }
-    }
-
-    showBalanceLoadingSpinner(true, 'loading.balance_updated');
-    await new Promise(r => setTimeout(r, 1200));
-
-  } catch (error) {
-    console.error('[UI] Balance update error:', error);
-    showBalanceLoadingSpinner(true, 'loading.update_error');
-    await new Promise(r => setTimeout(r, 1500));
-  } finally {
-    showBalanceLoadingSpinner(false);
-    endOperation('balance-refresh');
-  }
-}
-
-async function showSuccessPopup(txid) {
-  armInactivityTimerSafely();
-
-  if (window.showSuccessPopup) {
-    await window.showSuccessPopup(txid);
-  } else {
-    const successMsg = getTranslation('popup.transaction_success',
-      `Transaction réussie ! TXID: ${txid}`,
-      { txid }
-    );
-    alert(successMsg);
-  }
-}
-
-// === WALLET DISPLAY FUNCTIONS ===
 function hideAllAuthForms() {
   const emailForm = document.getElementById('emailForm');
   const keyForm = document.getElementById('keyForm');
   const tabEmail = document.getElementById('tabEmail');
   const tabKey = document.getElementById('tabKey');
-
+  
   if (emailForm) emailForm.style.display = 'none';
   if (keyForm) keyForm.style.display = 'none';
   if (tabEmail) tabEmail.style.display = 'none';
@@ -371,7 +86,7 @@ function clearInputFields() {
   const privateKeyField = document.getElementById(ELEMENT_IDS.PRIVATE_KEY_WIF);
   const emailField = document.getElementById(ELEMENT_IDS.EMAIL_INPUT);
   const passwordField = document.getElementById(ELEMENT_IDS.PASSWORD_INPUT);
-
+  
   if (privateKeyField) {
     privateKeyField.value = '';
     privateKeyField.style.filter = 'blur(4px)';
@@ -380,39 +95,32 @@ function clearInputFields() {
   if (passwordField) passwordField.value = '';
 }
 
-// === GESTION DU SÉLECTEUR D'ADRESSE ===
 function updateAddressSelector(importType) {
   const selector = document.getElementById(ELEMENT_IDS.DEBIT_ADDRESS_TYPE);
   if (!selector) return;
 
-  // Sauvegarder la valeur actuelle
   const currentValue = selector.value;
-
-  // Effacer les options existantes
   selector.innerHTML = '';
-
+  
   if (importType === 'hd' || importType === 'email' || importType === 'mnemonic' || importType === 'xprv') {
-    // HD Wallet : Bech32 + Taproot
     const bech32Option = document.createElement('option');
     bech32Option.value = 'bech32';
     bech32Option.selected = true;
     bech32Option.setAttribute('data-i18n', 'send_section.bech32_option');
     bech32Option.textContent = 'Bech32';
     selector.appendChild(bech32Option);
-
+    
     const taprootOption = document.createElement('option');
     taprootOption.value = 'p2tr';
     taprootOption.textContent = 'Bech32m (Taproot)';
     selector.appendChild(taprootOption);
-
-    // Restaurer la valeur si possible
+    
     if (currentValue === 'p2tr') {
       selector.value = 'p2tr';
     } else {
       selector.value = 'bech32';
     }
   } else {
-    // Clé simple (WIF/Hex) : Seulement Bech32
     const bech32Option = document.createElement('option');
     bech32Option.value = 'bech32';
     bech32Option.selected = true;
@@ -424,18 +132,17 @@ function updateAddressSelector(importType) {
 
 function displayWalletInfo(addresses, importType) {
   armInactivityTimerSafely();
-
+  
   const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
   const bech32Element = document.getElementById(ELEMENT_IDS.BECH32_ADDRESS);
   const taprootElement = document.getElementById(ELEMENT_IDS.TAPROOT_ADDRESS);
   const addressesSection = document.getElementById('nito-addresses');
-
+  
   if (walletAddressElement && addresses) {
-    const balanceText = getTranslation('import_section.balance', 'Solde:');
-
-    // Affichage selon le type d'import
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+    const balanceText = t('import_section.balance', 'Solde:');
+    
     if (importType === 'hd' || importType === 'email' || importType === 'mnemonic' || importType === 'xprv') {
-      // HD Wallet : afficher Bech32 + Taproot
       walletAddressElement.innerHTML = `
         <div style="margin-top: 10px;">
           <strong>Bech32:</strong> ${addresses.bech32}<br>
@@ -446,7 +153,6 @@ function displayWalletInfo(addresses, importType) {
         </div>
       `;
     } else {
-      // Clé simple : afficher seulement Bech32
       walletAddressElement.innerHTML = `
         <div style="margin-top: 10px;">
           <strong>Bech32:</strong> ${addresses.bech32}
@@ -456,25 +162,25 @@ function displayWalletInfo(addresses, importType) {
         </div>
       `;
     }
-
+    
     if (addressesSection) {
       addressesSection.style.display = 'block';
       if (bech32Element) bech32Element.value = addresses.bech32 || '';
       if (taprootElement) taprootElement.value = addresses.taproot || '';
     }
   }
-
-  // Mettre à jour le sélecteur d'adresse
+  
   updateAddressSelector(importType);
-
-  // Mettre à jour le solde automatiquement
+  injectConsolidateButton();
+  
   setTimeout(async () => {
     try {
       if (window.getTotalBalance) {
         const total = await window.getTotalBalance();
         const balanceElement = document.getElementById('totalBalance');
         if (balanceElement) {
-          const balanceText = getTranslation('import_section.balance', 'Solde:');
+          const t = window.getTranslation || ((key, fallback) => fallback || key);
+          const balanceText = t('import_section.balance', 'Solde:');
           balanceElement.textContent = `${balanceText} ${total.toFixed(8)} NITO`;
         }
       }
@@ -482,54 +188,52 @@ function displayWalletInfo(addresses, importType) {
       console.error('[UI] Auto balance update error:', error);
     }
   }, 1000);
-
-  injectConsolidateButton();
 }
 
 function injectConsolidateButton() {
   const consolidateContainer = document.querySelector('.consolidate-container');
   if (consolidateContainer && !consolidateContainer.querySelector('#consolidateButton')) {
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+      
     const consolidateButton = document.createElement('button');
     consolidateButton.id = 'consolidateButton';
     consolidateButton.className = 'consolidate-button';
     consolidateButton.type = 'button';
-    consolidateButton.setAttribute('data-i18n','consolidate.cta');
+    consolidateButton.setAttribute('data-i18n','consolidate.cta'); 
     consolidateButton.textContent = t('consolidate.cta', 'Consolider les UTXOs');
     consolidateButton.style.display = 'inline-block';
     consolidateButton.style.marginTop = '10px';
-
+    
     consolidateButton.addEventListener('click', async () => {
       armInactivityTimerSafely();
-
-      if (isOperationActive('consolidation')) {
+      
+      if (window.isOperationActive && window.isOperationActive('consolidation')) {
         return;
       }
-
+      
       if (window.consolidateUtxos) {
         await window.consolidateUtxos();
-        setTimeout(() => updateBalanceWithCacheClear(), 3000);
+        setTimeout(() => {
+          if (window.refreshAllBalances) {
+            window.refreshAllBalances();
+          }
+        }, 3000);
       } else {
-        const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
+        const t = window.getTranslation || ((key, fallback) => fallback || key);
+        const errorMsg = t('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
         alert(errorMsg);
       }
     });
-
+    
     consolidateContainer.appendChild(consolidateButton);
   }
 }
 
-// === SECURE SEED COPY SYSTEM ===
 function createSecureSeedButton(mnemonic, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  const t = (window.i18next && typeof window.i18next.t === 'function')
-    ? window.i18next.t
-    : (key, fallback) => fallback || key;
+  const t = window.getTranslation || ((key, fallback) => fallback || key);
 
   const existingSeedButton = document.getElementById(ELEMENT_IDS.EMAIL_SEED_BUTTON);
   if (existingSeedButton) {
@@ -548,26 +252,26 @@ function createSecureSeedButton(mnemonic, containerId) {
 
   seedButton.addEventListener('click', () => {
     armInactivityTimerSafely();
-
+    
     if (!isRevealed) {
       const seedDisplay = document.createElement('div');
       seedDisplay.id = 'tempSeedDisplay';
       seedDisplay.style.cssText = `
-        margin: 10px 0;
-        padding: 15px;
-        background: rgba(var(--glass-bg), 0.1);
-        border: 1px solid var(--glass-border);
-        border-radius: 12px;
-        font-family: monospace;
-        word-break: break-all;
+        margin: 10px 0; 
+        padding: 15px; 
+        background: rgba(var(--glass-bg), 0.1); 
+        border: 1px solid var(--glass-border); 
+        border-radius: 12px; 
+        font-family: monospace; 
+        word-break: break-all; 
         border-left: 4px solid #4caf50;
         position: relative;
       `;
-
+      
       const warningText = t('seed_reveal.warning_title', '⚠️ Phrase mnémotechnique (24 mots) :');
       const copyButtonText = t('seed_reveal.copy_button', '📋 Copier');
       const timeoutWarning = t('seed_reveal.timeout_warning', 'Cette phrase sera automatiquement masquée dans 30 secondes');
-
+      
       seedDisplay.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 8px;">${warningText}</div>
         <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-bottom: 8px;">${mnemonic}</div>
@@ -581,7 +285,7 @@ function createSecureSeedButton(mnemonic, containerId) {
 
       document.getElementById('copySeedBtn').addEventListener('click', () => {
         armInactivityTimerSafely();
-
+        
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(mnemonic).then(() => {
             const successMsg = t('seed_reveal.copy_success', 'Phrase mnémotechnique copiée dans le presse-papiers !');
@@ -621,7 +325,7 @@ function createSecureSeedButton(mnemonic, containerId) {
     }
     seedButton.textContent = t('seed_reveal.button_reveal', '🔒 Révéler la phrase mnémotechnique');
     isRevealed = false;
-
+    
     if (revealTimeout) {
       clearTimeout(revealTimeout);
       revealTimeout = null;
@@ -632,30 +336,27 @@ function createSecureSeedButton(mnemonic, containerId) {
   return seedButton;
 }
 
-// === WALLET GENERATION HANDLERS ===
 function setupGenerationHandlers() {
   addUniqueEventListener(ELEMENT_IDS.GENERATE_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
-    if (isOperationActive('generation')) {
+    
+    if (window.isOperationActive && window.isOperationActive('generation')) {
       return;
     }
-
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
+    
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+      
     try {
-      startOperation('generation');
-      showLoadingSpinner(true);
+      if (window.startOperation) window.startOperation('generation');
+      if (window.showLoading) window.showLoading(true);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, true);
-
+      
       armInactivityTimerSafely();
 
       if (window.hdManager) {
         const mnemonic = await window.hdManager.generateMnemonic(24);
         const addresses = await window.hdManager.importHDWallet(mnemonic);
-
+        
         document.getElementById(ELEMENT_IDS.HD_MASTER_KEY).textContent = addresses.hdMasterKey || '';
         document.getElementById(ELEMENT_IDS.MNEMONIC_PHRASE).textContent = addresses.mnemonic || '';
         document.getElementById(ELEMENT_IDS.GENERATED_ADDRESS).innerHTML = `
@@ -672,7 +373,7 @@ function setupGenerationHandlers() {
           console.warn('[UI] Counter update failed:', e);
         }
 
-        console.log('HD wallet generated (XPRV + SEED):', {
+        console.log('HD wallet generated (24 words):', {
           bech32: addresses.bech32,
           taproot: addresses.taproot,
           legacy: addresses.legacy,
@@ -680,13 +381,13 @@ function setupGenerationHandlers() {
         });
       }
     } catch (error) {
-      const errorMsg = getTranslation('errors.generation_failed', `Erreur de génération: ${error.message}`);
+      const errorMsg = t('errors.generation_failed', `Erreur de génération: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Generation error:', error);
     } finally {
-      showLoadingSpinner(false);
+      if (window.showLoading) window.showLoading(false);
       setButtonLoading(ELEMENT_IDS.GENERATE_BUTTON, false);
-      endOperation('generation');
+      if (window.endOperation) window.endOperation('generation');
     }
   });
 
@@ -701,80 +402,76 @@ function setupGenerationHandlers() {
   });
 }
 
-// === WALLET IMPORT HANDLERS ===
 function setupImportHandlers() {
   addUniqueEventListener(ELEMENT_IDS.IMPORT_WALLET_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
-    if (isOperationActive('import')) {
+    
+    if (window.isOperationActive && window.isOperationActive('import')) {
       return;
     }
-
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
+    
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+      
     try {
-      startOperation('import');
-      showConnectionLoadingSpinner(true, 'loading.importing_wallet');
+      if (window.startOperation) window.startOperation('import');
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(true, 'loading.importing_wallet');
       setButtonLoading(ELEMENT_IDS.IMPORT_WALLET_BUTTON, true);
-
+      
       const input = document.getElementById(ELEMENT_IDS.PRIVATE_KEY_WIF)?.value?.trim();
       if (!input) {
-        const errorMsg = getTranslation('errors.enter_key', 'Veuillez entrer une clé privée, mnemonic ou XPRV');
+        const errorMsg = t('errors.enter_key', 'Veuillez entrer une clé privée, mnemonic ou XPRV');
         alert(errorMsg);
         return;
       }
 
       const result = await window.importWallet(input);
-
+      
       if (result.success) {
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
         clearInputFields();
-
+        
+        console.log('Wallet imported successfully:', result.importType);
       } else {
-        const errorMsg = getTranslation('errors.import_failed', `Échec de l'import: ${result.error}`);
+        const errorMsg = t('errors.import_failed', `Échec de l'import: ${result.error}`);
         alert(errorMsg);
       }
     } catch (error) {
-      const errorMsg = getTranslation('errors.import_error', `Erreur d'import: ${error.message}`);
+      const errorMsg = t('errors.import_error', `Erreur d'import: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Import error:', error);
     } finally {
-      showConnectionLoadingSpinner(false);
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.IMPORT_WALLET_BUTTON, false);
-      endOperation('import');
+      if (window.endOperation) window.endOperation('import');
     }
   });
 
   addUniqueEventListener(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
-    if (isOperationActive('email-connect')) {
+    
+    if (window.isOperationActive && window.isOperationActive('email-connect')) {
       return;
     }
-
-    const t = (window.i18next && typeof window.i18next.t === 'function')
-      ? window.i18next.t
-      : (key, fallback) => fallback || key;
-
+    
+    const t = window.getTranslation || ((key, fallback) => fallback || key);
+      
     try {
-      startOperation('email-connect');
-      showConnectionLoadingSpinner(true, 'loading.connecting_email');
+      if (window.startOperation) window.startOperation('email-connect');
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(true, 'loading.connecting_email');
       setButtonLoading(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, true);
-
+      
       const email = document.getElementById(ELEMENT_IDS.EMAIL_INPUT)?.value?.trim();
       const password = document.getElementById(ELEMENT_IDS.PASSWORD_INPUT)?.value?.trim();
-
+      
       if (!email || !password) {
-        const errorMsg = getTranslation('errors.enter_email_password', 'Veuillez entrer l\'email et le mot de passe');
+        const errorMsg = t('errors.enter_email_password', 'Veuillez entrer l\'email et le mot de passe');
         alert(errorMsg);
         return;
       }
-
+      
       const result = await window.importWallet(email, password);
-
+      
       if (result.success) {
         displayWalletInfo(result.addresses, result.importType);
         hideAllAuthForms();
@@ -783,28 +480,30 @@ function setupImportHandlers() {
         if (result.mnemonic) {
           createSecureSeedButton(result.mnemonic, 'emailForm');
         }
-
+        
       } else {
-        const errorMsg = getTranslation('errors.connection_failed', `Échec de la connexion: ${result.error}`);
+        const errorMsg = t('errors.connection_failed', `Échec de la connexion: ${result.error}`);
         alert(errorMsg);
       }
     } catch (error) {
-      const errorMsg = getTranslation('errors.connection_error', `Erreur de connexion: ${error.message}`);
+      const errorMsg = t('errors.connection_error', `Erreur de connexion: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Connection error:', error);
     } finally {
-      showConnectionLoadingSpinner(false);
+      if (window.showBalanceLoadingSpinner) window.showBalanceLoadingSpinner(false);
       setButtonLoading(ELEMENT_IDS.CONNECT_EMAIL_BUTTON, false);
-      endOperation('email-connect');
+      if (window.endOperation) window.endOperation('email-connect');
     }
   });
 
   addUniqueEventListener(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
+    
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_BALANCE_BUTTON, true);
-      await window.updateBalanceWithLoadingPopup();
+      if (window.refreshAllBalances) {
+        await window.refreshAllBalances();
+      }
     } catch (error) {
       console.error('[UI] Refresh balance error:', error);
     } finally {
@@ -813,7 +512,6 @@ function setupImportHandlers() {
   });
 }
 
-// === AUTHENTICATION SYSTEM ===
 function setupAuthenticationSystem() {
   const tabEmail = document.getElementById('tabEmail');
   const tabKey = document.getElementById('tabKey');
@@ -823,45 +521,42 @@ function setupAuthenticationSystem() {
   if (tabEmail && tabKey && emailForm && keyForm) {
     addUniqueEventListener('tabEmail', 'click', () => {
       armInactivityTimerSafely();
-
+      
       tabEmail.classList.add('active');
       tabKey.classList.remove('active');
       emailForm.classList.add('active');
       keyForm.classList.remove('active');
       emailForm.style.display = 'block';
       keyForm.style.display = 'none';
-
+      
       tabKey.style.display = 'block';
       tabEmail.style.display = 'block';
     });
-
+    
     addUniqueEventListener('tabKey', 'click', () => {
       armInactivityTimerSafely();
-
+      
       tabKey.classList.add('active');
       tabEmail.classList.remove('active');
       keyForm.classList.add('active');
       emailForm.classList.remove('active');
       keyForm.style.display = 'block';
       emailForm.style.display = 'none';
-
+      
       tabEmail.style.display = 'block';
       tabKey.style.display = 'block';
     });
   }
 }
 
-// === TRANSACTION HANDLERS ===
 function setupTransactionHandlers() {
-  const t = (window.i18next && typeof window.i18next.t === 'function')
-    ? window.i18next.t
-    : (key, fallback) => fallback || key;
-
+  const t = window.getTranslation || ((key, fallback) => fallback || key);
+    
   addUniqueEventListener(ELEMENT_IDS.MAX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
     try {
       if (!window.isWalletReady || !window.isWalletReady()) {
-        const errorMsg = getTranslation('errors.import_first', "Importez d'abord un wallet");
+        const errorMsg = t('errors.import_first', "Importez d'abord un wallet");
         alert(errorMsg);
         return;
       }
@@ -945,111 +640,117 @@ function setupTransactionHandlers() {
 
   addUniqueEventListener(ELEMENT_IDS.PREPARE_TX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
-    if (isOperationActive('transaction')) {
+    
+    if (window.isOperationActive && window.isOperationActive('transaction')) {
       return;
     }
-
+    
     try {
-      startOperation('transaction');
-      showLoadingSpinner(true);
+      if (window.startOperation) window.startOperation('transaction');
+      if (window.showLoading) window.showLoading(true);
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, true);
-
+      
       const to = document.getElementById(ELEMENT_IDS.DESTINATION_ADDRESS)?.value?.trim();
       const amount = parseFloat(document.getElementById(ELEMENT_IDS.AMOUNT_NITO)?.value || '0');
-
+      
       if (!to || !amount || amount <= 0) {
-        const errorMsg = getTranslation('errors.fill_destination_amount', 'Veuillez remplir l\'adresse de destination et le montant');
+        const errorMsg = t('errors.fill_destination_amount', 'Veuillez remplir l\'adresse de destination et le montant');
         alert(errorMsg);
         return;
       }
-
+      
       if (!window.signTxWithPSBT) {
-        const errorMsg = getTranslation('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
+        const errorMsg = t('errors.transaction_functions_unavailable', 'Fonctions de transaction non disponibles');
         throw new Error(errorMsg);
       }
-
+      
       if (window.getTotalBalance) {
         const totalBal = await window.getTotalBalance();
         const feeReserve = 0.0005;
-
+        
         if (amount > (totalBal - feeReserve)) {
-          const errorMsg = getTranslation('errors.amount_too_high',
+          const errorMsg = t('errors.amount_too_high', 
             `Montant trop élevé. Maximum: ${(totalBal - feeReserve).toFixed(8)} NITO (${feeReserve} NITO réservés pour les frais)`
           );
           throw new Error(errorMsg);
         }
       }
-
+      
       const result = await window.signTxWithPSBT(to, amount, false);
-
+      
       document.getElementById(ELEMENT_IDS.SIGNED_TX).textContent = result.hex;
       document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'block';
-
+      
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'inline-block';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'inline-block';
-
+      
     } catch (error) {
-      const errorMsg = getTranslation('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
+      const errorMsg = t('errors.transaction_prep_failed', `Échec de la préparation de la transaction: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Transaction preparation error:', error);
     } finally {
-      showLoadingSpinner(false);
+      if (window.showLoading) window.showLoading(false);
       setButtonLoading(ELEMENT_IDS.PREPARE_TX_BUTTON, false);
-      endOperation('transaction');
+      if (window.endOperation) window.endOperation('transaction');
     }
   });
 
   addUniqueEventListener(ELEMENT_IDS.BROADCAST_TX_BUTTON, 'click', async () => {
     armInactivityTimerSafely();
-
-    if (isOperationActive('broadcast')) {
+    
+    if (window.isOperationActive && window.isOperationActive('broadcast')) {
       return;
     }
-
+    
     try {
-      startOperation('broadcast');
-      showLoadingSpinner(true);
+      if (window.startOperation) window.startOperation('broadcast');
+      if (window.showLoading) window.showLoading(true);
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, true);
-
+      
       const hex = document.getElementById(ELEMENT_IDS.SIGNED_TX)?.textContent;
       if (!hex) {
-        const errorMsg = getTranslation('errors.no_transaction', 'Aucune transaction à diffuser');
+        const errorMsg = t('errors.no_transaction', 'Aucune transaction à diffuser');
         alert(errorMsg);
         return;
       }
-
+      
       if (!window.rpc) {
-        const errorMsg = getTranslation('errors.rpc_unavailable', 'Fonction RPC non disponible');
+        const errorMsg = t('errors.rpc_unavailable', 'Fonction RPC non disponible');
         throw new Error(errorMsg);
       }
-
+      
       const txid = await window.rpc('sendrawtransaction', [hex]);
-
-      await showSuccessPopup(txid);
-
+      
+      if (window.showSuccessPopup) {
+        await window.showSuccessPopup(txid);
+      }
+      
       document.getElementById(ELEMENT_IDS.DESTINATION_ADDRESS).value = '';
       document.getElementById(ELEMENT_IDS.AMOUNT_NITO).value = '';
       document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
       document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
       document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
-
-      setTimeout(() => updateBalanceWithCacheClear(), 2000);
-
+      
+      setTimeout(() => {
+        if (window.refreshAllBalances) {
+          window.refreshAllBalances();
+        }
+      }, 2000);
+      
     } catch (error) {
-      const errorMsg = getTranslation('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
+      const errorMsg = t('errors.broadcast_failed', `Échec de la diffusion: ${error.message}`);
       alert(errorMsg);
       console.error('[UI] Broadcast error:', error);
     } finally {
-      showLoadingSpinner(false);
+      if (window.showLoading) window.showLoading(false);
       setButtonLoading(ELEMENT_IDS.BROADCAST_TX_BUTTON, false);
-      endOperation('broadcast');
+      if (window.endOperation) window.endOperation('broadcast');
     }
   });
 
   addUniqueEventListener(ELEMENT_IDS.CANCEL_TX_BUTTON, 'click', () => {
     armInactivityTimerSafely();
-
+    
     document.getElementById(ELEMENT_IDS.TX_HEX_CONTAINER).style.display = 'none';
     document.getElementById(ELEMENT_IDS.BROADCAST_TX_BUTTON).style.display = 'none';
     document.getElementById(ELEMENT_IDS.CANCEL_TX_BUTTON).style.display = 'none';
@@ -1063,10 +764,12 @@ function setupTransactionHandlers() {
 
   addUniqueEventListener(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, 'click', async () => {
     armInactivityTimerSafely();
-
+    
     try {
       setButtonLoading(ELEMENT_IDS.REFRESH_SEND_TAB_BALANCE, true);
-      await window.updateBalanceWithLoadingPopup();
+      if (window.refreshAllBalances) {
+        await window.refreshAllBalances();
+      }
     } catch (error) {
       console.error('[UI] Send tab balance refresh error:', error);
     } finally {
@@ -1075,18 +778,17 @@ function setupTransactionHandlers() {
   });
 }
 
-// === MAIN SETUP FUNCTION ===
 export function setupUIHandlers() {
   if (setupComplete) {
     return true;
   }
-
+  
   try {
     setupGenerationHandlers();
     setupImportHandlers();
     setupAuthenticationSystem();
     setupTransactionHandlers();
-
+    
     setupComplete = true;
     return true;
   } catch (error) {
@@ -1096,18 +798,16 @@ export function setupUIHandlers() {
   }
 }
 
-// === CLEANUP FUNCTION ===
 export function cleanupUIHandlers() {
   handlerRegistry.forEach((handler, key) => {
     const [elementId, eventType] = key.split(':');
     removeEventListener(elementId, eventType);
   });
-
+  
   handlerRegistry.clear();
   setupComplete = false;
 }
 
-// === AUTO-INITIALIZATION ===
 function initializeWhenReady() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1118,7 +818,6 @@ function initializeWhenReady() {
   }
 }
 
-// === RE-SETUP ON LANGUAGE CHANGE ===
 if (typeof window !== 'undefined') {
   if (window.i18next && typeof window.i18next.on === 'function') {
     window.i18next.on('languageChanged', () => {
@@ -1140,18 +839,16 @@ if (typeof window !== 'undefined') {
 
 initializeWhenReady();
 
-// === GLOBAL ACCESS ===
 if (typeof window !== 'undefined') {
   window.setupUIHandlers = setupUIHandlers;
   window.cleanupUIHandlers = cleanupUIHandlers;
-  window.updateBalanceWithAnimation = updateBalanceWithAnimation;
-  window.updateBalanceWithCacheClear = updateBalanceWithCacheClear;
-  window.showConnectionLoadingSpinner = showConnectionLoadingSpinner;
-  window.showBalanceLoadingSpinner = showBalanceLoadingSpinner;
   window.addUniqueEventListener = addUniqueEventListener;
   window.removeEventListener = removeEventListener;
   window.displayWalletInfo = displayWalletInfo;
   window.updateAddressSelector = updateAddressSelector;
+  window.hideAllAuthForms = hideAllAuthForms;
+  window.clearInputFields = clearInputFields;
+  window.createSecureSeedButton = createSecureSeedButton;
 }
 
 console.log('UI handlers module loaded - Version 2.0.0');
