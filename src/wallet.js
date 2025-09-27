@@ -6,14 +6,6 @@ import { keyManager, validateInput, deriveFromCredentials, armInactivityTimerSaf
 import { eventBus, EVENTS } from './events.js';
 import { waitForLibraries } from './vendor.js';
 
-// === TRANSLATION HELPER ===
-function getTranslation(key, fallback, params = {}) {
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
-    : () => fallback || key;
-  return t(key, { ...params, defaultValue: fallback });
-}
-
 // === GLOBAL STATE ===
 let lastTxid = null;
 window._lastConsolidationTxid = null;
@@ -36,26 +28,6 @@ async function getBitcoinLibraries() {
     bip39: window.bip39,
     bip32: window.bip32
   };
-}
-
-// === OPERATION TRACKING ===
-function isOperationActive(operationType = null) {
-  if (window.isOperationActive) {
-    return window.isOperationActive(operationType);
-  }
-  return false;
-}
-
-function startOperation(operationType) {
-  if (window.startOperation) {
-    window.startOperation(operationType);
-  }
-}
-
-function endOperation(operationType) {
-  if (window.endOperation) {
-    window.endOperation(operationType);
-  }
 }
 
 // === EXPLORER AND CONFIRMATION UTILITIES ===
@@ -103,9 +75,7 @@ async function showSuccessPopup(txid) {
   _pendingConfirmations.add(txid);
   _refreshBlocked = true;
 
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
-    : (key, fallback) => fallback || key;
+  const t = window.getTranslation || ((key, fallback) => fallback || key);
 
   const refreshBtn = document.getElementById(ELEMENT_IDS.REFRESH_BALANCE_BUTTON);
   if (refreshBtn) {
@@ -283,8 +253,7 @@ export class TaprootUtils {
     const tweakedPrivateKey = window.bitcoin.crypto.privateAdd(privateKey, tweak);
     
     if (!tweakedPrivateKey) {
-      const errorMsg = getTranslation('security.invalid_tweaked_key', 'Clé privée modifiée invalide');
-      throw new Error(errorMsg);
+      throw new Error('Invalid tweaked private key');
     }
     
     const tweakedPublicKey = window.bitcoin.crypto.pointFromScalar(tweakedPrivateKey, true);
@@ -378,11 +347,11 @@ export class HDWalletManager {
   }
 
   async importHDWallet(seedOrXprv, passphrase = '') {
-    if (isOperationActive('wallet-import')) {
+    if (window.isOperationActive && window.isOperationActive('wallet-import')) {
       throw new Error('Wallet import already in progress');
     }
     
-    startOperation('wallet-import');
+    if (window.startOperation) window.startOperation('wallet-import');
     
     try {
       const { bitcoin, bip32, bip39 } = await getBitcoinLibraries();
@@ -425,7 +394,7 @@ export class HDWalletManager {
     } catch (error) {
       throw new Error(`HD wallet import failed: ${error.message}`);
     } finally {
-      endOperation('wallet-import');
+      if (window.endOperation) window.endOperation('wallet-import');
     }
   }
 
@@ -821,11 +790,11 @@ class WalletState {
   }
 
   async updateBalance() {
-    if (isOperationActive('balance-update')) {
+    if (window.isOperationActive && window.isOperationActive('balance-update')) {
       return this.totalBalance;
     }
     
-    startOperation('balance-update');
+    if (window.startOperation) window.startOperation('balance-update');
     
     try {
       let total = 0;
@@ -836,7 +805,6 @@ class WalletState {
           total += bech32Balance || 0;
         }
         
-        // Pour HD seulement, inclure taproot dans le calcul
         if (this.taprootAddress && this.importType === 'hd') {
           const taprootBalance = await window.balance(this.taprootAddress, true, hdManager.hdWallet);
           total += taprootBalance || 0;
@@ -848,7 +816,7 @@ class WalletState {
     } catch (error) {
       return this.totalBalance;
     } finally {
-      endOperation('balance-update');
+      if (window.endOperation) window.endOperation('balance-update');
     }
   }
 }
@@ -890,8 +858,7 @@ export async function genAddr(type) {
 export async function importWIF(wif) {
   try {
     if (!validateInput(wif, 'wif')) {
-      const errorMsg = getTranslation('security.invalid_wif_format', 'Format WIF invalide');
-      throw new Error(errorMsg);
+      throw new Error('Invalid WIF format');
     }
 
     const { bitcoin, ECPair } = await getBitcoinLibraries();
@@ -912,34 +879,30 @@ export async function importWIF(wif) {
     const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: pubkeyBuffer, network: NITO_NETWORK });
     const p2sh = bitcoin.payments.p2sh({ redeem: p2wpkh, network: NITO_NETWORK });
     
-    // Pour les clés simples WIF, pas d'adresse taproot
     return {
       legacy: p2pkh.address,
       p2sh: p2sh.address,
       bech32: p2wpkh.address,
-      taproot: '', // Pas de taproot pour les clés simples
+      taproot: '',
       keyPair: kp,
       publicKey: pubkeyBuffer
     };
   } catch (error) {
-    const errorMsg = getTranslation('security.invalid_wif', 'WIF invalide: {{error}}', { error: error.message });
-    throw new Error(errorMsg);
+    throw new Error(`Invalid WIF: ${error.message}`);
   }
 }
 
 export async function importHex(hex) {
   try {
     if (!validateInput(hex, 'hex')) {
-      const errorMsg = getTranslation('security.invalid_hex_format', 'Format hex invalide - doit contenir 64 caractères');
-      throw new Error(errorMsg);
+      throw new Error('Invalid hex format - must be 64 characters');
     }
 
     const { bitcoin, ECPair } = await getBitcoinLibraries();
 
     const privateKeyBuffer = Buffer.from(hex, 'hex');
     if (privateKeyBuffer.length !== 32) {
-      const errorMsg = getTranslation('security.private_key_32_bytes', 'La clé privée doit faire 32 octets');
-      throw new Error(errorMsg);
+      throw new Error('Private key must be 32 bytes');
     }
     
     const kp = ECPair.fromPrivateKey(privateKeyBuffer, { network: NITO_NETWORK });
@@ -949,70 +912,16 @@ export async function importHex(hex) {
     const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: pubkeyBuffer, network: NITO_NETWORK });
     const p2sh = bitcoin.payments.p2sh({ redeem: p2wpkh, network: NITO_NETWORK });
     
-    // Pour les clés simples Hex, pas d'adresse taproot
     return {
       legacy: p2pkh.address,
       p2sh: p2sh.address,
       bech32: p2wpkh.address,
-      taproot: '', // Pas de taproot pour les clés simples
+      taproot: '',
       keyPair: kp,
       publicKey: pubkeyBuffer
     };
   } catch (error) {
-    const errorMsg = getTranslation('security.invalid_private_key', 'Clé privée invalide: {{error}}', { error: error.message });
-    throw new Error(errorMsg);
-  }
-}
-
-// === MISE À JOUR AUTOMATIQUE DU SOLDE ===
-async function updateBalanceWithLoadingPopup() {
-  // Déclencher le popup sablier
-  if (window.showBalanceLoadingSpinner) {
-    window.showBalanceLoadingSpinner(true, 'loading.balance_refresh');
-  }
-  
-  try {
-    // Mettre à jour le solde total directement
-    if (window.getTotalBalance) {
-      const total = await window.getTotalBalance();
-      const balanceElement = document.getElementById('totalBalance');
-      if (balanceElement) {
-        const balanceText = getTranslation('import_section.balance', 'Solde:');
-        balanceElement.innerHTML = `${balanceText} ${total.toFixed(8)} NITO`;
-        balanceElement.style.fontWeight = 'bold';
-        balanceElement.style.color = '#2196F3';
-      }
-    }
-    
-    // Mettre à jour le solde du sélecteur d'envoi si on est sur cet onglet
-    const sendTabBalance = document.getElementById('sendTabBalance');
-    if (sendTabBalance && window.balance) {
-      const selectedType = document.getElementById('debitAddressType')?.value || 'bech32';
-      const address = selectedType === 'p2tr' ? walletState.taprootAddress : walletState.bech32Address;
-      if (address) {
-        const isHD = walletState.importType === 'hd';
-        const hdWallet = isHD ? hdManager.hdWallet : null;
-        const balance = await window.balance(address, isHD, hdWallet);
-        sendTabBalance.textContent = (balance || 0).toFixed(8);
-      }
-    }
-    
-    // Afficher le message de succès
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(true, 'loading.balance_updated');
-      await new Promise(r => setTimeout(r, 1200));
-    }
-    
-  } catch (error) {
-    console.error('Balance update error:', error);
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(true, 'loading.update_error');
-      await new Promise(r => setTimeout(r, 1500));
-    }
-  } finally {
-    if (window.showBalanceLoadingSpinner) {
-      window.showBalanceLoadingSpinner(false);
-    }
+    throw new Error(`Invalid private key: ${error.message}`);
   }
 }
 
@@ -1020,7 +929,6 @@ async function updateBalanceWithLoadingPopup() {
 export async function importWallet(arg1, arg2) {
   try {
     if (typeof arg2 === 'string' && typeof arg1 === 'string') {
-      // Import via email/password
       const email = arg1.trim().toLowerCase();
       const password = arg2.trim();
       
@@ -1045,7 +953,6 @@ export async function importWallet(arg1, arg2) {
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType: 'email' });
       
-      // Log pour HD avec les 4 types d'adresses
       if (FEATURE_FLAGS.LOG_ADDRESSES) {
         console.log('=== WALLET ADDRESSES (HD) ===');
         console.log('Legacy (P2PKH)  :', addresses.legacy);
@@ -1057,11 +964,6 @@ export async function importWallet(arg1, arg2) {
       
       console.log('Email wallet connected successfully');
       
-      // Mise à jour automatique du solde
-      setTimeout(() => {
-        updateBalanceWithLoadingPopup();
-      }, 500);
-      
       return { 
         success: true, 
         importType: 'email', 
@@ -1069,7 +971,6 @@ export async function importWallet(arg1, arg2) {
         addresses 
       };
     } else {
-      // Import via clé/mnemonic/xprv
       const input = (arg1 || '').toString().trim();
       if (!input) {
         throw new Error('Empty input provided');
@@ -1118,8 +1019,6 @@ export async function importWallet(arg1, arg2) {
           publicKey: addresses.publicKey.toString('hex')
         });
         
-        // Pas de stockage taproot pour les clés simples
-        
       } else if (validateInput(input, 'hex')) {
         addresses = await importHex(input);
         walletState.importType = 'single';
@@ -1128,8 +1027,6 @@ export async function importWallet(arg1, arg2) {
           privateKey: addresses.keyPair.privateKey.toString('hex'),
           publicKey: addresses.publicKey.toString('hex')
         });
-        
-        // Pas de stockage taproot pour les clés simples
         
       } else {
         throw new Error('Unsupported input format');
@@ -1148,7 +1045,6 @@ export async function importWallet(arg1, arg2) {
       syncGlobalState();
       eventBus.emit(EVENTS.WALLET_IMPORTED, { addresses, importType });
       
-      // Logs appropriés selon le type
       if (FEATURE_FLAGS.LOG_ADDRESSES) {
         if (walletState.importType === 'hd') {
           console.log('=== WALLET ADDRESSES (HD) ===');
@@ -1167,11 +1063,6 @@ export async function importWallet(arg1, arg2) {
       }
       
       console.log('Wallet imported successfully:', importType);
-      
-      // Mise à jour automatique du solde
-      setTimeout(() => {
-        updateBalanceWithLoadingPopup();
-      }, 500);
                         
       return { 
         success: true, 
@@ -1189,11 +1080,11 @@ export async function importWallet(arg1, arg2) {
 
 // === UTXO AND BALANCE FUNCTIONS ===
 export async function utxos(addr, isHD = false, hdWallet = null) {
-  if (isOperationActive('utxo-scan')) {
+  if (window.isOperationActive && window.isOperationActive('utxo-scan')) {
     return [];
   }
   
-  startOperation('utxo-scan');
+  if (window.startOperation) window.startOperation('utxo-scan');
   
   try {
     if (isHD && hdWallet) {
@@ -1224,7 +1115,7 @@ export async function utxos(addr, isHD = false, hdWallet = null) {
   } catch (error) {
     throw error;
   } finally {
-    endOperation('utxo-scan');
+    if (window.endOperation) window.endOperation('utxo-scan');
   }
 }
 
@@ -1331,221 +1222,6 @@ export function updateInactivityTimer() {
   walletState.timerInterval = setInterval(updateTimer, 1000);
 }
 
-// === WALLET DISPLAY FUNCTIONS ===
-function hideAllAuthForms() {
-  const emailForm = document.getElementById('emailForm');
-  const keyForm = document.getElementById('keyForm');
-  const tabEmail = document.getElementById('tabEmail');
-  const tabKey = document.getElementById('tabKey');
-  
-  if (emailForm) emailForm.style.display = 'none';
-  if (keyForm) keyForm.style.display = 'none';
-  if (tabEmail) tabEmail.style.display = 'none';
-  if (tabKey) tabKey.style.display = 'none';
-}
-
-function clearInputFields() {
-  const privateKeyField = document.getElementById(ELEMENT_IDS.PRIVATE_KEY_WIF);
-  const emailField = document.getElementById(ELEMENT_IDS.EMAIL_INPUT);
-  const passwordField = document.getElementById(ELEMENT_IDS.PASSWORD_INPUT);
-  
-  if (privateKeyField) {
-    privateKeyField.value = '';
-    privateKeyField.style.filter = 'blur(4px)';
-  }
-  if (emailField) emailField.value = '';
-  if (passwordField) passwordField.value = '';
-}
-
-function displayWalletInfo(addresses, importType) {
-  armInactivityTimerSafely();
-  
-  const walletAddressElement = document.getElementById(ELEMENT_IDS.WALLET_ADDRESS);
-  const bech32Element = document.getElementById(ELEMENT_IDS.BECH32_ADDRESS);
-  const taprootElement = document.getElementById(ELEMENT_IDS.TAPROOT_ADDRESS);
-  const addressesSection = document.getElementById('nito-addresses');
-  
-  if (walletAddressElement && addresses) {
-    const balanceText = getTranslation('import_section.balance', 'Solde:');
-    
-    // Affichage selon le type d'import
-    if (importType === 'hd' || importType === 'email' || importType === 'xprv' || importType === 'mnemonic') {
-      walletAddressElement.innerHTML = `
-        <div style="margin-top: 10px;">
-          <strong>Bech32:</strong> ${addresses.bech32}<br>
-          <strong>Taproot:</strong> ${addresses.taproot}
-        </div>
-        <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
-          ${balanceText} 0.00000000 NITO
-        </div>
-      `;
-    } else {
-      // Pour les clés simples, afficher seulement Bech32
-      walletAddressElement.innerHTML = `
-        <div style="margin-top: 10px;">
-          <strong>Bech32:</strong> ${addresses.bech32}
-        </div>
-        <div id="totalBalance" style="margin-top: 10px; font-weight: bold; color: #2196F3;">
-          ${balanceText} 0.00000000 NITO
-        </div>
-      `;
-    }
-    
-    if (addressesSection) {
-      addressesSection.style.display = 'block';
-      if (bech32Element) bech32Element.value = addresses.bech32 || '';
-      if (taprootElement) taprootElement.value = addresses.taproot || '';
-    }
-  }
-  
-  injectConsolidateButton();
-}
-
-function injectConsolidateButton() {
-  const consolidateContainer = document.querySelector('.consolidate-container');
-  if (consolidateContainer && !consolidateContainer.querySelector('#consolidateButton')) {
-    const t = (window.i18next && typeof window.i18next.t === 'function') 
-      ? window.i18next.t 
-      : (key, fallback) => fallback || key;
-      
-    const consolidateButton = document.createElement('button');
-    consolidateButton.id = 'consolidateButton';
-    consolidateButton.className = 'consolidate-button';
-    consolidateButton.type = 'button';
-    consolidateButton.setAttribute('data-i18n','consolidate.cta'); 
-    consolidateButton.textContent = t('consolidate.cta', 'Consolider les UTXOs');
-    consolidateButton.style.display = 'inline-block';
-    consolidateButton.style.marginTop = '10px';
-    
-    consolidateButton.addEventListener('click', async () => {
-      armInactivityTimerSafely();
-      
-      if (isOperationActive('consolidation')) {
-        return;
-      }
-      
-      if (window.consolidateUtxos) {
-        await window.consolidateUtxos();
-      } else {
-        const errorMsg = getTranslation('errors.consolidation_unavailable', 'Fonction de consolidation non disponible');
-        alert(errorMsg);
-      }
-    });
-    
-    consolidateContainer.appendChild(consolidateButton);
-  }
-}
-
-// === SECURE SEED COPY SYSTEM ===
-function createSecureSeedButton(mnemonic, containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  const t = (window.i18next && typeof window.i18next.t === 'function') 
-    ? window.i18next.t 
-    : (key, fallback) => fallback || key;
-
-  const existingSeedButton = document.getElementById(ELEMENT_IDS.EMAIL_SEED_BUTTON);
-  if (existingSeedButton) {
-    existingSeedButton.remove();
-  }
-
-  const seedButton = document.createElement('button');
-  seedButton.id = ELEMENT_IDS.EMAIL_SEED_BUTTON;
-  seedButton.className = 'reveal-btn';
-  seedButton.textContent = t('seed_reveal.button_reveal', '🔒 Révéler la phrase mnémotechnique');
-  seedButton.style.marginTop = '10px';
-  seedButton.style.display = 'block';
-
-  let isRevealed = false;
-  let revealTimeout = null;
-
-  seedButton.addEventListener('click', () => {
-    armInactivityTimerSafely();
-    
-    if (!isRevealed) {
-      const seedDisplay = document.createElement('div');
-      seedDisplay.id = 'tempSeedDisplay';
-      seedDisplay.style.cssText = `
-        margin: 10px 0; 
-        padding: 15px; 
-        background: rgba(var(--glass-bg), 0.1); 
-        border: 1px solid var(--glass-border); 
-        border-radius: 12px; 
-        font-family: monospace; 
-        word-break: break-all; 
-        border-left: 4px solid #4caf50;
-        position: relative;
-      `;
-      
-      const warningText = t('seed_reveal.warning_title', '⚠️ Phrase mnémotechnique (24 mots) :');
-      const copyButtonText = t('seed_reveal.copy_button', '📋 Copier');
-      const timeoutWarning = t('seed_reveal.timeout_warning', 'Cette phrase sera automatiquement masquée dans 30 secondes');
-      
-      seedDisplay.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 8px;">${warningText}</div>
-        <div style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-bottom: 8px;">${mnemonic}</div>
-        <button id="copySeedBtn" class="copy-btn" style="margin-right: 8px;">${copyButtonText}</button>
-        <small style="color: var(--text-secondary); font-size: 0.85em;">
-          ${timeoutWarning}
-        </small>
-      `;
-
-      container.appendChild(seedDisplay);
-
-      document.getElementById('copySeedBtn').addEventListener('click', () => {
-        armInactivityTimerSafely();
-        
-        if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard.writeText(mnemonic).then(() => {
-            const successMsg = t('seed_reveal.copy_success', 'Phrase mnémotechnique copiée dans le presse-papiers !');
-            alert(successMsg);
-          }).catch(() => {
-            const textArea = document.createElement('textarea');
-            textArea.value = mnemonic;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            const fallbackMsg = t('seed_reveal.copy_fallback', 'Phrase mnémotechnique copiée !');
-            alert(fallbackMsg);
-          });
-        }
-      });
-
-      seedButton.textContent = t('seed_reveal.button_hide', '🔒 Masquer la phrase');
-      isRevealed = true;
-
-      revealTimeout = setTimeout(() => {
-        hideSeed();
-      }, 30000);
-
-    } else {
-      hideSeed();
-    }
-  });
-
-  function hideSeed() {
-    const seedDisplay = document.getElementById('tempSeedDisplay');
-    if (seedDisplay) {
-      seedDisplay.remove();
-    }
-    seedButton.textContent = t('seed_reveal.button_reveal', '🔒 Révéler la phrase mnémotechnique');
-    isRevealed = false;
-    
-    if (revealTimeout) {
-      clearTimeout(revealTimeout);
-      revealTimeout = null;
-    }
-  }
-
-  container.appendChild(seedButton);
-  return seedButton;
-}
-
 // === GLOBAL STATE SYNC ===
 export function syncGlobalState() {
   if (typeof window !== 'undefined') {
@@ -1584,11 +1260,6 @@ if (typeof window !== 'undefined') {
   window.utxos = utxos;
   window.balance = balance;
   window.showSuccessPopup = showSuccessPopup;
-  window.displayWalletInfo = displayWalletInfo;
-  window.hideAllAuthForms = hideAllAuthForms;
-  window.clearInputFields = clearInputFields;
-  window.createSecureSeedButton = createSecureSeedButton;
-  window.updateBalanceWithLoadingPopup = updateBalanceWithLoadingPopup;
   
   window.walletAddress = '';
   window.legacyAddress = '';
