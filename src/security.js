@@ -772,8 +772,6 @@ const timerContext = new TimerContext();
 // CORRECTION PRINCIPALE: Amélioration de armInactivityTimerSafely
 export function armInactivityTimerSafely() {
   try {
-    console.log('[SECURITY] armInactivityTimerSafely called - resetting timer');
-
     if (timerContext.hasContext('generation')) {
       if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
         keyManager.updateLastActionTime();
