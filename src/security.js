@@ -12,6 +12,11 @@ function getTranslation(key, fallback, params = {}) {
   return t(key, { ...params, defaultValue: fallback });
 }
 
+// === TIMER RECURSION PROTECTION ===
+let timerUpdateInProgress = false;
+let lastTimerUpdate = 0;
+const TIMER_COOLDOWN = 100; // ms
+
 // === TIMER CONTEXT MANAGEMENT ===
 class TimerContext {
   constructor() {
@@ -413,7 +418,16 @@ class SecureKeyManager {
     });
   }
 
+  // === MÉTHODE CORRIGÉE SANS RÉCURSION ===
   updateLastActionTime() {
+    const now = Date.now();
+    
+    // Protection contre les appels trop fréquents
+    if (now - lastTimerUpdate < TIMER_COOLDOWN) {
+      return;
+    }
+    
+    lastTimerUpdate = now;
     this.updateAccess();
   }
 }
@@ -722,24 +736,35 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
   }
 }
 
-// === TIMER MANAGEMENT ===
+// === TIMER MANAGEMENT CORRIGÉ ===
 const timerContext = new TimerContext();
 
 export function armInactivityTimerSafely() {
   try {
-    if (timerContext.hasContext('generation')) {
+    // Protection contre la récursion
+    if (timerUpdateInProgress) {
+      return;
+    }
+    
+    const now = Date.now();
+    if (now - lastTimerUpdate < TIMER_COOLDOWN) {
+      return;
+    }
+    
+    timerUpdateInProgress = true;
+    
+    try {
+      // Mise à jour directe du timer sans événements
       if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
         keyManager.updateLastActionTime();
       }
+    } finally {
+      timerUpdateInProgress = false;
     }
-
-    if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
-      keyManager.updateLastActionTime();
-    }
-
-    eventBus.emit(EVENTS.TIMER_ARM_REQUEST);
+    
   } catch (error) {
     console.warn('Timer arm failed:', error);
+    timerUpdateInProgress = false;
   }
 }
 
@@ -755,13 +780,7 @@ export function clearTimerContext() {
 export const keyManager = new SecureKeyManager();
 export const rateLimiter = new RateLimiter();
 
-// === EVENT LISTENERS ===
-eventBus.on(EVENTS.TIMER_ARM_REQUEST, () => {
-  if (keyManager) {
-    keyManager.updateLastActionTime();
-  }
-});
-
+// === EVENT LISTENERS SIMPLIFIÉS ===
 eventBus.on(EVENTS.KEYS_CLEARED, (data) => {
   // Event handled silently
 });
