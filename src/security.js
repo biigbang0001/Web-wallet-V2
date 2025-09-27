@@ -57,7 +57,7 @@ class SecureKeyManager {
     this.displayTimer = null;
     this.operationCheckTimer = null;
     this.lastClearReason = null;
-    this.isInactivityActive = false; // Nouveau: track l'état du timer d'inactivité
+    this.isInactivityActive = false;
 
     this.setupAutoCleanup();
     this.setupPageHideCleanup();
@@ -114,7 +114,6 @@ class SecureKeyManager {
       this.updateAccess();
 
       if (this.encryptedData.size >= SECURITY_CONFIG.MAX_MEMORY_KEYS) {
-        console.warn('Maximum key storage exceeded, clearing oldest keys');
         this.clearOldestKeys(1);
       }
 
@@ -124,7 +123,6 @@ class SecureKeyManager {
         timestamp: Date.now()
       });
 
-      console.log(`[SECURITY] Secure key stored: ${id}`);
     } catch (error) {
       console.error(`Failed to store key ${id}:`, error);
       throw error;
@@ -155,11 +153,9 @@ class SecureKeyManager {
 
     entries.forEach(([id]) => {
       this.encryptedData.delete(id);
-      console.log(`[SECURITY] Cleared old key: ${id}`);
     });
   }
 
-  // Amélioration: Méthode pour vérifier si une opération est en cours
   isOperationInProgress() {
     if (typeof window !== 'undefined' && window.isOperationActive) {
       return window.isOperationActive();
@@ -167,7 +163,6 @@ class SecureKeyManager {
     return false;
   }
 
-  // Amélioration: Méthode pour vérifier si on est dans une phase d'import/génération
   isWalletOperationInProgress() {
     if (typeof window !== 'undefined' && window.isOperationActive) {
       return window.isOperationActive('import') ||
@@ -179,7 +174,6 @@ class SecureKeyManager {
     return false;
   }
 
-  // CORRECTION PRINCIPALE: Distinction entre types de nettoyage
   clearAll(reason = 'unknown') {
     try {
       this.lastClearReason = reason;
@@ -193,7 +187,6 @@ class SecureKeyManager {
         this.cleanupTimer = null;
       }
 
-      // CORRECTION: Ne pas arrêter le timer d'inactivité sauf pour les vrais timeouts
       if (reason === 'inactivity_timeout' || reason === 'session_timeout') {
         if (this.inactivityTimer) {
           clearTimeout(this.inactivityTimer);
@@ -214,13 +207,9 @@ class SecureKeyManager {
 
       eventBus.emit(EVENTS.KEYS_CLEARED, { reason });
 
-      // CORRECTION: Auto-reload seulement pour les vrais timeouts de sécurité
       const securityTimeouts = ['inactivity_timeout', 'session_timeout'];
       if (FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR && securityTimeouts.includes(reason)) {
-        console.log(`[SECURITY] Security timeout detected (${reason}), scheduling auto-reload`);
         this.scheduleAutoReload();
-      } else {
-        console.log(`[SECURITY] Keys cleared for reason: ${reason}, no auto-reload needed`);
       }
 
     } catch (error) {
@@ -229,18 +218,13 @@ class SecureKeyManager {
   }
 
   scheduleAutoReload() {
-    console.log('[SECURITY] Scheduling auto-reload check...');
-
     const checkAndReload = () => {
-      // Vérification plus stricte des opérations
       if (this.isWalletOperationInProgress()) {
-        console.log('[SECURITY] Wallet operation in progress, delaying auto-reload...');
         setTimeout(checkAndReload, 5000);
         return;
       }
 
       if (this.isOperationInProgress()) {
-        console.log('[SECURITY] General operation in progress, delaying auto-reload...');
         setTimeout(checkAndReload, 3000);
         return;
       }
@@ -248,20 +232,14 @@ class SecureKeyManager {
       this.executeAutoReload();
     };
 
-    // Attendre plus longtemps avant le premier check
     setTimeout(checkAndReload, 5000);
   }
 
   executeAutoReload() {
-    console.log('[SECURITY] Executing auto-reload...');
-
-    // Vérification finale
     if (this.isWalletOperationInProgress()) {
-      console.log('[SECURITY] Aborting auto-reload, wallet operation detected');
       return;
     }
 
-    // CORRECTION: Afficher une notification traduite avant le rechargement
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -275,8 +253,12 @@ class SecureKeyManager {
       backdrop-filter: blur(10px);
     `;
 
-    const title = getTranslation('security.session_expired_title', 'Session expirée');
-    const message = getTranslation('security.auto_reload_message', 'Rechargement automatique...');
+    const title = (window.i18next && window.i18next.isInitialized) 
+      ? getTranslation('security.session_expired_title', 'Session expirée')
+      : 'Session expirée';
+    const message = (window.i18next && window.i18next.isInitialized)
+      ? getTranslation('security.auto_reload_message', 'Rechargement automatique...')
+      : 'Rechargement automatique...';
 
     overlay.innerHTML = `
       <div style="
@@ -302,33 +284,26 @@ class SecureKeyManager {
   }
 
   setupOperationMonitoring() {
-    // Surveiller périodiquement les opérations pour un rechargement sûr
     this.operationCheckTimer = setInterval(() => {
-      // Fonction de monitoring passive
+      // Monitoring passif
     }, 5000);
   }
 
-  // CORRECTION PRINCIPALE: Amélioration de la gestion du timer d'inactivité
   updateAccess() {
     const now = Date.now();
     this.lastAccess = now;
-
-    // CORRECTION: Réinitialiser complètement le timer d'inactivité
     this.resetInactivityTimer();
-
   }
 
   setupAutoCleanup() {
     if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
     this.cleanupTimer = setTimeout(() => {
-      // CORRECTION: Spécifier la raison correcte
       this.clearAll('session_timeout');
     }, SECURITY_CONFIG.SESSION_TIMEOUT);
   }
 
   setupPageHideCleanup() {
     const cleanup = () => {
-      // CORRECTION: Spécifier la raison et ne nettoyer que l'affichage
       this.clearSensitiveDisplayOnly('page_unload');
       this.clearSensitiveFields();
     };
@@ -337,7 +312,6 @@ class SecureKeyManager {
     window.addEventListener('beforeunload', cleanup);
   }
 
-  // CORRECTION PRINCIPALE: Gestion complète du timer d'inactivité
   setupInactivityTimer() {
     this.isInactivityActive = true;
     this.resetInactivityTimer();
@@ -345,15 +319,12 @@ class SecureKeyManager {
   }
 
   resetInactivityTimer() {
-    // CORRECTION: Nettoyer l'ancien timer et en créer un nouveau
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
     }
 
-    // CORRECTION: Créer un nouveau timer de 10 minutes exactement
     this.inactivityTimer = setTimeout(() => {
-      console.log('[SECURITY] Inactivity timeout reached - clearing sensitive data');
       this.clearSensitiveData('inactivity_timeout');
       eventBus.emit(EVENTS.SESSION_EXPIRED, { reason: 'inactivity' });
     }, SECURITY_CONFIG.INACTIVITY_TIMEOUT);
@@ -384,17 +355,13 @@ class SecureKeyManager {
 
     timerElement.textContent = `[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}]`;
 
-    // CORRECTION: Quand le timer atteint 0, déclencher le timeout
     if (remaining <= 0 && this.isInactivityActive) {
       clearInterval(this.displayTimer);
       this.displayTimer = null;
     }
   }
 
-  // CORRECTION: Distinction entre nettoyage d'affichage et nettoyage complet
   clearSensitiveData(reason = 'inactivity') {
-    console.log(`[SECURITY] Clearing sensitive display data (reason: ${reason}), wallet keys preserved`);
-
     const sensitiveElements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -411,19 +378,14 @@ class SecureKeyManager {
       }
     });
 
-    // CORRECTION: Émettre l'événement avec la raison
     eventBus.emit(EVENTS.INACTIVITY_WARNING, { reason });
 
-    // CORRECTION: Pour les vrais timeouts d'inactivité, déclencher l'auto-reload
     if (reason === 'inactivity_timeout' && FEATURE_FLAGS.AUTO_RELOAD_ON_KEY_CLEAR) {
       this.scheduleAutoReload();
     }
   }
 
-  // NOUVELLE MÉTHODE: Nettoyage d'affichage seulement (pour page unload)
   clearSensitiveDisplayOnly(reason = 'page_unload') {
-    console.log(`[SECURITY] Clearing sensitive display only (reason: ${reason})`);
-
     const sensitiveElements = [
       ELEMENT_IDS.HD_MASTER_KEY,
       ELEMENT_IDS.MNEMONIC_PHRASE,
@@ -451,7 +413,6 @@ class SecureKeyManager {
     });
   }
 
-  // CORRECTION: S'assurer que chaque action utilisateur réinitialise le timer
   updateLastActionTime() {
     this.updateAccess();
   }
@@ -734,7 +695,6 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
       return false;
     }
 
-    // Remove existing listeners to prevent duplicates
     const newButton = button.cloneNode(true);
     button.parentNode.replaceChild(newButton, button);
 
@@ -745,12 +705,9 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
         newButton.disabled = true;
         target.classList.remove('blurred');
 
-        console.log(`[SECURITY] Content revealed: ${targetId}`);
-
         setTimeout(() => {
           target.classList.add('blurred');
           newButton.disabled = false;
-          console.log(`[SECURITY] Content auto-hidden: ${targetId}`);
         }, timeout);
       } catch (error) {
         console.error(`Reveal button error for ${buttonId}:`, error);
@@ -758,7 +715,6 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
       }
     });
 
-    console.log(`[SECURITY] Reveal button setup completed: ${buttonId} -> ${targetId}`);
     return true;
   } catch (error) {
     console.error(`Failed to setup reveal button ${buttonId}:`, error);
@@ -769,7 +725,6 @@ export function setupRevealButton(buttonId, targetId, timeout = SECURITY_CONFIG.
 // === TIMER MANAGEMENT ===
 const timerContext = new TimerContext();
 
-// CORRECTION PRINCIPALE: Amélioration de armInactivityTimerSafely
 export function armInactivityTimerSafely() {
   try {
     if (timerContext.hasContext('generation')) {
@@ -778,7 +733,6 @@ export function armInactivityTimerSafely() {
       }
     }
 
-    // CORRECTION: Toujours réinitialiser le timer d'inactivité
     if (keyManager && typeof keyManager.updateLastActionTime === 'function') {
       keyManager.updateLastActionTime();
     }
@@ -809,17 +763,13 @@ eventBus.on(EVENTS.TIMER_ARM_REQUEST, () => {
 });
 
 eventBus.on(EVENTS.KEYS_CLEARED, (data) => {
-  console.log('[SECURITY] Keys cleared event received:', data?.reason || 'unknown reason');
+  // Event handled silently
 });
 
 eventBus.on(EVENTS.SESSION_EXPIRED, (data) => {
-  console.log('[SECURITY] Session expired event received:', data);
-
-  // CORRECTION: Afficher un avertissement traduit avant l'auto-reload
   const warningMsg = getTranslation('security.session_timeout_warning',
     'Session expirée pour cause d\'inactivité. Le wallet va se recharger automatiquement.');
 
-  // Afficher une notification non-bloquante
   if (window.showNotification) {
     window.showNotification(warningMsg, 'warning');
   }
@@ -836,12 +786,8 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
     setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
-
-    console.log('[SECURITY] Security layer initialized - Version 2.0.0');
   });
 } else {
   setupRevealButton(ELEMENT_IDS.REVEAL_HD_KEY, ELEMENT_IDS.HD_MASTER_KEY);
   setupRevealButton(ELEMENT_IDS.REVEAL_MNEMONIC, ELEMENT_IDS.MNEMONIC_PHRASE);
-
-  console.log('[SECURITY] Security layer initialized - Version 2.0.0');
 }
