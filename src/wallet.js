@@ -152,7 +152,7 @@ async function showSuccessPopup(txid) {
   const txidLinkSpan = popup.querySelector('#txidLink');
   const closeButtonEl = popup.querySelector('#closeSuccessPopup');
 
-  const clearAll = () => {
+  const clearAll = async () => {
     try { if (_successPopupTimer) clearTimeout(_successPopupTimer); } catch(_) {}
     _successPopupTimer = null;
     if (_successPopupEl && _successPopupEl.parentNode) {
@@ -168,6 +168,42 @@ async function showSuccessPopup(txid) {
         const refreshText = t('import_section.refresh_button', 'Refresh');
         refreshBtn.textContent = refreshText;
       }
+    }
+
+    if (progress >= 100) {
+      console.log('[POPUP] Transaction was confirmed, starting intelligent refresh...');
+      
+      setTimeout(async () => {
+        if (window.refreshAllBalances) {
+          let balanceFound = false;
+          
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            console.log(`[POPUP] Balance refresh attempt ${attempt}/3 after popup close...`);
+            
+            await window.refreshAllBalances();
+            
+            if (window.getTotalBalance) {
+              const currentBalance = await window.getTotalBalance();
+              console.log(`[POPUP] Current balance: ${currentBalance.toFixed(8)} NITO`);
+              
+              if (currentBalance > 0) {
+                console.log(`[POPUP] Balance refreshed successfully on attempt ${attempt}`);
+                balanceFound = true;
+                break;
+              }
+            }
+            
+            if (attempt < 3) {
+              console.log(`[POPUP] Balance still 0, waiting 3 seconds before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+          }
+          
+          if (!balanceFound) {
+            console.log(`[POPUP] Balance still 0 after 3 attempts, UTXOs may need more time to be indexed`);
+          }
+        }
+      }, 500);
     }
   };
 
