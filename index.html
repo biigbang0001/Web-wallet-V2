@@ -140,7 +140,7 @@
     <nav id="mainTabs" class="tabs">
       <button type="button" class="active" data-tab="tab-gen" data-i18n="generate_section.title">🎯 Generate Nito Private Key</button>
       <button type="button" data-tab="tab-send" data-i18n="send_section.title">📤 Send NITO</button>
-      <button type="button" data-tab="tab-msg" data-i18n="encrypted_messaging.title">🔒 Encrypted Messaging</button>
+      <button type="button" data-tab="tab-msg" data-i18n="encrypted_messaging.title">🔐 Encrypted Messaging</button>
     </nav>
 
     <!-- === GENERATE TAB === -->
@@ -168,7 +168,7 @@
             <input id="emailInput" type="email" placeholder="email@domain.com" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
             <input id="passwordInput" type="password" placeholder="Password" autocomplete="new-password" name="nito-pass" autocapitalize="none" autocorrect="off" spellcheck="false">
           </form>
-          <button id="connectEmailButton" data-i18n="import_section.import_button" type="button">🔐 Connect</button>
+          <button id="connectEmailButton" data-i18n="import_section.import_button" type="button">🔓 Connect</button>
           <button id="emailSeedButton" class="copy-btn" style="display:none;" data-i18n="chat.copy_seed">🔑 Copy mnemonic phrase</button>
         </div>
 
@@ -201,7 +201,7 @@
           <span id="sendTabBalance"></span>
           <button id="refreshSendTabBalance" type="button" class="copy-btn" data-i18n="import_section.refresh_button">🔄</button>
         </p>
-        <button id="prepareTxButton" data-i18n="send_section.prepare_button">🔏 Prepare</button>
+        <button id="prepareTxButton" data-i18n="send_section.prepare_button">🔍 Prepare</button>
         <button id="broadcastTxButton" data-i18n="send_section.broadcast_button" style="display: none;">✅ Broadcast transaction</button>
         <button id="cancelTxButton" data-i18n="send_section.cancel_button" style="display: none;">❌ Cancel</button>
         <div class="consolidate-container"></div>
@@ -218,7 +218,7 @@
     <div id="tab-msg" class="tab-pane">
       <!-- === ENCRYPTED MESSAGING SECTION === -->
       <div class="section">
-        <h2 data-i18n="encrypted_messaging.title">🔒 Encrypted Messaging</h2>
+        <h2 data-i18n="encrypted_messaging.title">🔐 Encrypted Messaging</h2>
         <button id="publishPubkeyButton" data-i18n="encrypted_messaging.publish_pubkey">📢 Publish my public key</button>
         <p style="font-size: 14px; color: #666; margin-top: 5px;">📋 <span data-i18n="encrypted_messaging.publish_info">Publish your public key once to allow others to send you encrypted messages.</span></p>
         <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--glass-border);" />
@@ -300,6 +300,20 @@
       <div style="font-size:2rem; line-height:1; margin-bottom:.5rem; animation: rotate 1.2s linear infinite;">⌛</div>
       <div class="loading-text" style="font-weight:600;">Refreshing balance…</div>
     </div>
+  </div>
+
+  <!-- === INITIAL LOADING OVERLAY === -->
+  <div id="initialLoadingOverlay" style="
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+  ">
+    <div style="font-size: 4rem; animation: rotate 1.5s linear infinite;">⌛</div>
   </div>
 
 </body>
