@@ -1,4 +1,4 @@
-# Web-wallet-V2
+# Web-wallet-V3
 ___
 # In progress, version not usable at the moment
 ___
