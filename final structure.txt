@@ -1,6 +1,6 @@
 var/www/wallet-nito-test/
 ├── index.html
-├── sw.js
+├── nito.png
 ├── locales/
 │   ├── fr.json
 │   ├── en.json
@@ -23,4 +23,5 @@ var/www/wallet-nito-test/
 ├── api/
 │   └── get-counter.php
 └── data/
+
     └── counter.txt
