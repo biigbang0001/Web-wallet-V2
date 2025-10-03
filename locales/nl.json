@@ -1,0 +1,282 @@
+{
+  "languages": {
+    "fr": "Français",
+    "en": "English",
+    "de": "Deutsch",
+    "es": "Español",
+    "nl": "Nederlands",
+    "ru": "Русский",
+    "zh": "中文"
+  },
+  
+  "title": "NITO Wallet",
+  "language_label": "Taal:",
+  
+  "counter": {
+    "keys_generated": "🔑 Gegenereerde Nito-sleutels:"
+  },
+  
+  "generate_section": {
+    "title": "🎯 Nito Privésleutel Genereren",
+    "generate_button": "🎲 Genereren",
+    "copy": "📋 Kopiëren",
+    "reveal": "👁️ Tonen",
+    "warning": "⚠️ Bewaar de privésleutel onmiddellijk! Deze wordt gewist na 10 minuten inactiviteit of na het herladen van de pagina.",
+    "hd_mnemonic_title": "HD MNEMONISCHE SEED :",
+    "xprv_title": "XPRV HD Hoofdsleutel:",
+    "reveal_mnemonic": "Toon Mnemonic",
+    "reveal_xprv": "Toon XPRV"
+  },
+  
+  "import_section": {
+    "title": "📥 Een Portemonnee Importeren",
+    "import_button": "📥 Importeren",
+    "refresh_button": "🔄 Verversen",
+    "balance": "Saldo:"
+  },
+  
+  "send_section": {
+    "title": "📤 NITO Verzenden",
+    "destination_placeholder": "Ontvangersadres",
+    "amount_placeholder": "Bedrag (NITO)",
+    "debit_label": "Af te schrijven adres:",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔏 Voorbereiden",
+    "broadcast_button": "✅ Transactie uitzenden",
+    "cancel_button": "❌ Annuleren",
+    "signed_tx": "Ondertekende transactie (hex):",
+    "copy_tx": "📋 Kopiëren"
+  },
+  
+  "encrypted_messaging": {
+    "title": "🔐 Versleutelde Berichten",
+    "publish_pubkey": "📢 Publiceer mijn publieke sleutel",
+    "publish_info": "Publiceer uw publieke sleutel eenmalig zodat anderen u versleutelde berichten kunnen sturen.",
+    "write_title": "✏️ Een bericht schrijven",
+    "message_placeholder": "Uw bericht (max 50000 tekens)",
+    "send_button": "📤 Verzenden",
+    "clear_button": "🗑️ Wissen",
+    "read_title": "📬 Berichten lezen",
+    "refresh_messages": "🔄 Berichten verversen",
+    "unread_messages": "ongelezen berichten",
+    "validate_button": "✅ Verzenden bevestigen",
+    "cancel_button": "❌ Annuleren",
+    "recipient_placeholder": "Ontvanger bech32-adres (nito1...)"
+  },
+  
+  "footer": {
+    "open_source": "Dit project is open source",
+    "view_code": "Code bekijken op GitHub",
+    "official_site": "Officiële NITO-site"
+  },
+  
+  "max_button": {
+    "text": "MAX"
+  },
+  
+  "common": {
+    "cancel": "Annuleren",
+    "close": "Sluiten",
+    "ok": "OK",
+    "confirm": "Bevestigen"
+  },
+  
+  "errors": {
+    "initialization_failed": "Initialisatie van app mislukt. Ververs de pagina.",
+    "libraries_timeout": "Time-out bij laden van bibliotheken",
+    "libraries_failed": "Bitcoin-bibliotheken konden niet worden geïnitialiseerd",
+    "missing_apis": "Ontbrekende vereiste browser-API's: {{apis}}",
+    "import_first": "Importeer eerst een portemonnee.",
+    "enter_key": "Voer een privésleutel, mnemonic of XPRV in",
+    "import_failed": "Import mislukt",
+    "import_error": "Import fout",
+    "enter_email_password": "Voer e-mailadres en wachtwoord in",
+    "connection_failed": "Verbinding mislukt",
+    "connection_error": "Verbindingsfout",
+    "generation_failed": "Generatiefout",
+    "fill_destination_amount": "Vul het bestemmingsadres en bedrag in",
+    "transaction_functions_unavailable": "Transactiefuncties niet beschikbaar",
+    "transaction_prep_failed": "Voorbereiding transactie mislukt",
+    "no_transaction": "Geen transactie om uit te zenden",
+    "rpc_unavailable": "RPC-functie niet beschikbaar",
+    "broadcast_failed": "Uitzenden mislukt",
+    "consolidation_unavailable": "Consolidatiefunctie niet beschikbaar",
+    "error_details": "Fout"
+  },
+  
+  "consolidate": {
+    "cta": "UTXO's Consolideren"
+  },
+  
+  "loading": {
+    "wallet_setup": "Portemonnee instellen...",
+    "refreshing": "⛏ Verversen...",
+    "importing_wallet": "Portemonnee importeren...",
+    "connecting_email": "Inloggen via e-mail...",
+    "blockchain_scan": "Blockchain scannen...",
+    "cache_clearing": "Cache wissen...",
+    "utxo_scan": "UTXO's analyseren...",
+    "balance_updated": "✅ Saldo bijgewerkt!",
+    "update_error": "❌ Update fout",
+    "calculating": "Berekenen...",
+    "preparing_transaction": "Transactie voorbereiden...",
+    "broadcasting": "Uitzenden..."
+  },
+  
+  "popup": {
+    "success_message": "Transactie succesvol verzonden!",
+    "confirmation_progress": "Bevestiging:",
+    "transaction_id": "Transactie-ID:",
+    "close_button": "Sluiten",
+    "confirming": "Bevestigen...",
+    "ok_button": "OK"
+  },
+  
+  "system": {
+    "initialization_error_title": "Initialisatiefout",
+    "reload_page": "Pagina herladen",
+    "wallet_ready": "NITO Portemonnee klaar in {{time}}ms - Versie {{version}}"
+  },
+  
+  "transactions": {
+    "insufficient_funds_after_fees": "Onvoldoende saldo na transactiekosten",
+    "no_suitable_utxos": "Geen geschikte volwassen UTXO's beschikbaar",
+    "need_at_least_utxos": "Minimaal {{count}} volwassen UTXO's nodig om te consolideren",
+    "consolidation_completed": "Consolidatie voltooid!\n{{original}} UTXO's → {{final}} UTXO('s)\nTransacties: {{txCount}}\nType: {{type}}",
+    "no_utxos_for_consolidation": "Geen UTXO's beschikbaar voor consolidatie",
+    "consolidation_error": "Consolidatiefout: {{error}}",
+    "consolidation_in_progress": "Consolidatie is al bezig. Wacht alstublieft.",
+    "import_wallet_first": "Importeer eerst een portemonnee.",
+    "no_utxos_available": "Geen UTXO's beschikbaar",
+    "insufficient_funds_simple": "Onvoldoende saldo",
+    "need_at_least_two_utxos": "Minimaal 2 volwassen UTXO's nodig om te consolideren. Gevonden: {{found}}",
+    "rpc_function_unavailable": "RPC-functie niet beschikbaar",
+    "source_address_not_found": "Bronadres niet gevonden voor type: {{type}}",
+    "failed_to_fetch_utxos": "Ophalen van UTXO's mislukt",
+    "invalid_destination": "Ongeldig bestemmingsadres",
+    "missing_keypair": "Ontbrekend sleutelpaar voor UTXO {{index}}",
+    "transaction_preparation_failed": "Voorbereiding transactie mislukt",
+    "consolidation_batch_skipped": "Consolidatiebatch {{batch}} overgeslagen",
+    "consolidation_batch_failed": "Consolidatiebatch {{batch}} mislukt: {{error}}"
+  },
+  
+  "security": {
+    "rate_limit_exceeded": "Limiet overschreden. Wacht {{seconds}} seconden voordat u het opnieuw probeert.",
+    "failed_to_encrypt": "Versleutelen van gevoelige gegevens mislukt",
+    "failed_to_decrypt": "Ontsleutelen van gegevens mislukt",
+    "element_not_found": "Element niet gevonden",
+    "nothing_to_copy": "Niets om te kopiëren",
+    "please_reveal_first": "Toon eerst de inhoud",
+    "copy_failed": "Kopiëren mislukt",
+    "copied": "Gekopieerd!",
+    "invalid_private_key": "Ongeldige privésleutel",
+    "invalid_hex_format": "Ongeldig hex-formaat - moet 64 tekens bevatten",
+    "private_key_32_bytes": "Privésleutel moet 32 bytes zijn",
+    "invalid_wif_format": "Ongeldig WIF-formaat",
+    "session_expired_title": "Sessie verlopen",
+    "auto_reload_message": "Automatisch herladen...",
+    "inactivity_detected": "Inactiviteit gedetecteerd",
+    "unknown_validation_type": "Onbekend validatietype: {{type}}",
+    "timer_arm_failed": "Timer activeren mislukt",
+    "failed_to_derive_credentials": "Afleiden van inloggegevens mislukt: {{error}}",
+    "empty_input": "Lege invoer opgegeven",
+    "invalid_email_format": "Ongeldig e-mailformaat",
+    "password_cannot_be_empty": "Wachtwoord mag niet leeg zijn",
+    "encryption_not_initialized": "Versleuteling niet geïnitialiseerd",
+    "invalid_data_type": "Ongeldig gegevenstype voor versleuteling",
+    "encryption_failed": "Versleuteling mislukt: {{error}}",
+    "invalid_encrypted_data": "Ongeldige versleutelde gegevens",
+    "decryption_failed": "Ontsleuteling mislukt: {{error}}"
+  },
+  
+  "messaging": {
+    "recipient_title": "📧 Berichtontvanger",
+    "estimated_cost": "Geschatte kosten: 0.0001 NITO (1 transactie)",
+    "searching_pubkey_for": "Publieke sleutel zoeken voor:",
+    "no_pubkey_found_for": "Geen publieke sleutel gevonden voor:",
+    "pubkey_found_validated_for": "PUBLIEKE SLEUTEL GEVONDEN EN GEVALIDEERD voor:",
+    "decryption_ecdh_completed": "ECDH-ontsleuteling voltooid, bericht geverifieerd:",
+    "encryption_ecdh_for": "ECDH-versleuteling voor:",
+    "analyzing_messages": "Berichten analyseren",
+    "encryption_successful": "Bericht versleuteld met ECDH + AES-GCM",
+    "pubkey_published": "Publieke sleutel gepubliceerd, TXID: {{txid}}",
+    "publication_error": "Publicatiefout: {{error}}",
+    "waiting_split_confirmation": "Wachten op splitsingsbevestiging...",
+    "message_sent_to": "Bericht verzonden naar:",
+    "message_divided": "Bericht opgedeeld in {{chunks}} stukken",
+    "no_messages_received": "Geen berichten ontvangen",
+    "wallet_not_initialized": "Portemonnee niet geïnitialiseerd",
+    "missing_keys_ecdh": "Ontbrekende sleutels voor ECDH",
+    "recipient_pubkey_not_found": "Publieke sleutel van ontvanger niet gevonden. De ontvanger moet eerst zijn publieke sleutel publiceren.",
+    "sender_pubkey_not_found": "Kan publieke sleutel van afzender niet vinden",
+    "insufficient_funds": "Onvoldoende saldo",
+    "opreturn_data_too_large": "OP_RETURN-gegevens te groot (max 75 bytes)",
+    "enter_message": "Voer een bericht in",
+    "fill_all_fields": "Vul alle velden in",
+    "invalid_bech32_address": "Ongeldig bech32-adres",
+    "message_too_long": "Bericht te lang: {{length}}/{{max}} tekens",
+    "invalid_private_key_ecdh": "Ongeldige privésleutel voor ECDH",
+    "ecdh_derivation_error": "Fout bij afleiden gedeelde sleutel: {{error}}",
+    "shared_key_derivation_error": "Fout bij afleiden gedeelde sleutel",
+    "encryption_error": "Versleutelingsfout: {{error}}",
+    "decryption_error_detail": "Ontsleutelingsfout: {{error}}",
+    "decryption_error": "Ontsleutelingsfout",
+    "no_recipient_address": "Geen ontvangersadres opgegeven",
+    "message_sent_success": "Bericht succesvol verzonden!",
+    "transactions": "transacties",
+    "unknown_sender": "Onbekende afzender",
+    "chunk_sent": "Stuk {{current}}/{{total}} verzonden: {{txid}}",
+    "chunk_abandoned": "Stuk {{chunk}} opgegeven na {{attempts}} pogingen",
+    "sending_completed": "Verzenden voltooid: {{successful}}/{{total}} stukken succesvol",
+    "confirmation_timeout": "Time-out bevestiging"
+  },
+  
+  "confirmations": {
+    "checking_confirmation": "Bevestigingen controleren...",
+    "confirmed": "Bevestigd"
+  },
+  
+  "wallet": {
+    "email_wallet_connected": "E-mail portemonnee succesvol verbonden ",
+    "email_connection_started": "E-mail aanmelding gestart, portemonnee genereren...",
+    "email_wallet_generated": "E-mail portemonnee gegenereerd, saldi berekenen...",
+    "invalid_pubkey_conversion": "Ongeldige publieke sleutel voor X-only conversie",
+    "bitcoin_library_unavailable": "Bitcoin-bibliotheek niet beschikbaar",
+    "invalid_tweaked_key": "Ongeldige aangepaste privésleutel",
+    "tweaked_pubkey_error": "Berekenen van aangepaste publieke sleutel mislukt",
+    "failed_to_create_taproot": "Maken van Taproot-adres mislukt",
+    "ecc_library_unavailable": "ECC-bibliotheek niet beschikbaar voor tweakSigner",
+    "invalid_seed_xprv": "Ongeldige seed of XPRV",
+    "invalid_mnemonic": "Ongeldige mnemonische zin",
+    "hd_wallet_import_failed": "HD-portemonnee import mislukt: {{error}}",
+    "hd_wallet_not_initialized": "HD-portemonnee niet geïnitialiseerd",
+    "hd_wallet_not_found": "HD-portemonnee niet gevonden",
+    "failed_to_derive_addresses": "Afleiden van adressen mislukt: {{error}}",
+    "unknown_address_family": "Onbekende adresfamilie: {{family}}",
+    "unsupported_input_format": "Niet-ondersteund invoerformaat",
+    "failed_to_generate_mnemonic": "Genereren van mnemonische zin mislukt",
+    "keymanager_not_initialized": "KeyManager niet geïnitialiseerd"
+  },
+  
+  "explorer": {
+    "primary_unavailable": "Primaire explorer niet beschikbaar, gebruik fallback explorer",
+    "checking_explorer": "Fout bij controleren explorer:"
+  },
+  
+  "ui": {
+    "calculating": "Berekenen...",
+    "max_function_unavailable": "Functie calculateMaxSendableAmount niet beschikbaar",
+    "max_calculation_error": "MAX-berekeningsfout: {{error}}",
+    "enter_destination_address": "Voer een bestemmingsadres in",
+    "invalid_amount": "Ongeldig bedrag",
+    "refresh_error": "Verversingsfout: {{error}}"
+  },
+  
+  "progress_indicators": {
+    "initializing": "Initialiseren...",
+    "preparing_utxos_percentage": "UTXO's voorbereiden: {{percentage}}%",
+    "preparing_missing_utxos": "{{count}} UTXO's voorbereiden...",
+    "utxos_ready": "UTXO's klaar",
+    "broadcasting_chunks": "Uitzenden {{current}}/{{total}}"
+  }
+}
