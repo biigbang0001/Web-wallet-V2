@@ -1,0 +1,282 @@
+{
+  "languages": {
+    "fr": "Français",
+    "en": "English",
+    "de": "Deutsch",
+    "es": "Español",
+    "nl": "Nederlands",
+    "ru": "Русский",
+    "zh": "中文"
+  },
+  
+  "title": "NITO Wallet",
+  "language_label": "Langue :",
+  
+  "counter": {
+    "keys_generated": "🔑 Clés Nito générées :"
+  },
+  
+  "generate_section": {
+    "title": "🎯 Génération / Import",
+    "generate_button": "🎲 Générer",
+    "copy": "📋 Copier",
+    "reveal": "👁️ Révéler",
+    "warning": "⚠️ Sauvegardez la clé privée immédiatement ! Elle sera effacée après 10 minutes d'inactivité ou après rechargement de la page.",
+    "hd_mnemonic_title": "PHRASE MNÉMONIQUE HD  :",
+    "xprv_title": "Clé maître XPRV HD :",
+    "reveal_mnemonic": "Révéler la phrase mnémonique",
+    "reveal_xprv": "Révéler XPRV"
+  },
+  
+  "import_section": {
+    "title": "📥 Importer un portefeuille",
+    "import_button": "📥 Importer",
+    "refresh_button": "🔄 Actualiser",
+    "balance": "Solde :"
+  },
+  
+  "send_section": {
+    "title": "📤 Envoyer NITO",
+    "destination_placeholder": "Adresse du destinataire",
+    "amount_placeholder": "Montant (NITO)",
+    "debit_label": "Débiter depuis l'adresse :",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔏 Préparer",
+    "broadcast_button": "✅ Diffuser la transaction",
+    "cancel_button": "❌ Annuler",
+    "signed_tx": "Transaction signée (hex) :",
+    "copy_tx": "📋 Copier"
+  },
+  
+  "encrypted_messaging": {
+    "title": "🔐 Messagerie chiffrée",
+    "publish_pubkey": "📢 Publier ma clé publique",
+    "publish_info": "Publiez votre clé publique une fois pour permettre aux autres de vous envoyer des messages chiffrés.",
+    "write_title": "✏️ Écrire un message",
+    "message_placeholder": "Votre message (max 50000 caractères)",
+    "send_button": "📤 Envoyer",
+    "clear_button": "🗑️ Effacer",
+    "read_title": "📬 Lire les messages",
+    "refresh_messages": "🔄 Actualiser les messages",
+    "unread_messages": "messages non lus",
+    "validate_button": "✅ Confirmer l'envoi",
+    "cancel_button": "❌ Annuler",
+    "recipient_placeholder": "Adresse bech32 du destinataire (nito1...)"
+  },
+  
+  "footer": {
+    "open_source": "Ce projet est open source",
+    "view_code": "Voir le code sur GitHub",
+    "official_site": "Site officiel NITO"
+  },
+  
+  "max_button": {
+    "text": "MAX"
+  },
+  
+  "common": {
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "ok": "OK",
+    "confirm": "Confirmer"
+  },
+  
+  "errors": {
+    "initialization_failed": "L'initialisation de l'application a échoué. Veuillez actualiser la page.",
+    "libraries_timeout": "Délai d'attente dépassé pour le chargement des bibliothèques",
+    "libraries_failed": "Les bibliothèques Bitcoin n'ont pas pu être initialisées correctement",
+    "missing_apis": "APIs de navigateur requises manquantes : {{apis}}",
+    "import_first": "Importez d'abord un portefeuille.",
+    "enter_key": "Veuillez entrer une clé privée, une phrase mnémonique ou un XPRV",
+    "import_failed": "L'importation a échoué",
+    "import_error": "Erreur d'importation",
+    "enter_email_password": "Veuillez entrer votre email et mot de passe",
+    "connection_failed": "La connexion a échoué",
+    "connection_error": "Erreur de connexion",
+    "generation_failed": "Erreur de génération",
+    "fill_destination_amount": "Veuillez remplir l'adresse de destination et le montant",
+    "transaction_functions_unavailable": "Fonctions de transaction indisponibles",
+    "transaction_prep_failed": "La préparation de la transaction a échoué",
+    "no_transaction": "Aucune transaction à diffuser",
+    "rpc_unavailable": "Fonction RPC indisponible",
+    "broadcast_failed": "La diffusion a échoué",
+    "consolidation_unavailable": "Fonction de consolidation indisponible",
+    "error_details": "Erreur"
+  },
+  
+  "consolidate": {
+    "cta": "Consolider les UTXO"
+  },
+  
+  "loading": {
+    "wallet_setup": "Configuration du portefeuille...",
+    "refreshing": "⛏ Actualisation...",
+    "importing_wallet": "Importation du portefeuille...",
+    "connecting_email": "Connexion par email...",
+    "blockchain_scan": "Analyse de la blockchain...",
+    "cache_clearing": "Effacement des caches...",
+    "utxo_scan": "Analyse des UTXO...",
+    "balance_updated": "✅ Solde mis à jour !",
+    "update_error": "❌ Erreur de mise à jour",
+    "calculating": "Calcul en cours...",
+    "preparing_transaction": "Préparation de la transaction...",
+    "broadcasting": "Diffusion..."
+  },
+  
+  "popup": {
+    "success_message": "Transaction envoyée avec succès !",
+    "confirmation_progress": "Confirmation :",
+    "transaction_id": "ID de transaction :",
+    "close_button": "Fermer",
+    "confirming": "Confirmation en cours...",
+    "ok_button": "OK"
+  },
+  
+  "system": {
+    "initialization_error_title": "Erreur d'initialisation",
+    "reload_page": "Recharger la page",
+    "wallet_ready": "Portefeuille NITO prêt en {{time}}ms - Version {{version}}"
+  },
+  
+  "transactions": {
+    "insufficient_funds_after_fees": "Fonds insuffisants après frais",
+    "no_suitable_utxos": "Aucun UTXO mature disponible",
+    "need_at_least_utxos": "Nécessite au moins {{count}} UTXO matures pour consolider",
+    "consolidation_completed": "Consolidation terminée !\n{{original}} UTXO → {{final}} UTXO\nTransactions : {{txCount}}\nType : {{type}}",
+    "no_utxos_for_consolidation": "Aucun UTXO disponible pour la consolidation",
+    "consolidation_error": "Erreur de consolidation : {{error}}",
+    "consolidation_in_progress": "Consolidation déjà en cours. Veuillez patienter.",
+    "import_wallet_first": "Importez d'abord un portefeuille.",
+    "no_utxos_available": "Aucun UTXO disponible",
+    "insufficient_funds_simple": "Fonds insuffisants",
+    "need_at_least_two_utxos": "Nécessite au moins 2 UTXO matures pour consolider. Trouvés : {{found}}",
+    "rpc_function_unavailable": "Fonction RPC indisponible",
+    "source_address_not_found": "Adresse source introuvable pour le type : {{type}}",
+    "failed_to_fetch_utxos": "Échec de récupération des UTXO",
+    "invalid_destination": "Adresse de destination invalide",
+    "missing_keypair": "Paire de clés manquante pour l'UTXO {{index}}",
+    "transaction_preparation_failed": "Échec de préparation de la transaction",
+    "consolidation_batch_skipped": "Lot de consolidation {{batch}} ignoré",
+    "consolidation_batch_failed": "Échec du lot de consolidation {{batch}} : {{error}}"
+  },
+  
+  "security": {
+    "rate_limit_exceeded": "Limite de taux dépassée. Veuillez attendre {{seconds}} secondes avant de réessayer.",
+    "failed_to_encrypt": "Échec du chiffrement des données sensibles",
+    "failed_to_decrypt": "Échec du déchiffrement des données",
+    "element_not_found": "Élément introuvable",
+    "nothing_to_copy": "Rien à copier",
+    "please_reveal_first": "Veuillez d'abord révéler le contenu",
+    "copy_failed": "Échec de la copie",
+    "copied": "Copié !",
+    "invalid_private_key": "Clé privée invalide",
+    "invalid_hex_format": "Format hexadécimal invalide - doit contenir 64 caractères",
+    "private_key_32_bytes": "La clé privée doit faire 32 octets",
+    "invalid_wif_format": "Format WIF invalide",
+    "session_expired_title": "Session expirée",
+    "auto_reload_message": "Rechargement automatique...",
+    "inactivity_detected": "Inactivité détectée",
+    "unknown_validation_type": "Type de validation inconnu : {{type}}",
+    "timer_arm_failed": "Échec de l'armement du minuteur",
+    "failed_to_derive_credentials": "Échec de dérivation des identifiants : {{error}}",
+    "empty_input": "Entrée vide fournie",
+    "invalid_email_format": "Format d'email invalide",
+    "password_cannot_be_empty": "Le mot de passe ne peut pas être vide",
+    "encryption_not_initialized": "Chiffrement non initialisé",
+    "invalid_data_type": "Type de données invalide pour le chiffrement",
+    "encryption_failed": "Échec du chiffrement : {{error}}",
+    "invalid_encrypted_data": "Données chiffrées invalides",
+    "decryption_failed": "Échec du déchiffrement : {{error}}"
+  },
+  
+  "messaging": {
+    "recipient_title": "📧 Destinataire du message",
+    "estimated_cost": "Coût estimé : 0,0001 NITO (1 transaction)",
+    "searching_pubkey_for": "Recherche de la clé publique pour :",
+    "no_pubkey_found_for": "Aucune clé publique trouvée pour :",
+    "pubkey_found_validated_for": "CLÉ PUBLIQUE TROUVÉE ET VALIDÉE pour :",
+    "decryption_ecdh_completed": "Déchiffrement ECDH terminé, message vérifié :",
+    "encryption_ecdh_for": "Chiffrement ECDH pour :",
+    "analyzing_messages": "Analyse des messages",
+    "encryption_successful": "Message chiffré avec ECDH + AES-GCM",
+    "pubkey_published": "Clé publique publiée, TXID : {{txid}}",
+    "publication_error": "Erreur de publication : {{error}}",
+    "waiting_split_confirmation": "Attente de confirmation de fractionnement...",
+    "message_sent_to": "Message envoyé à :",
+    "message_divided": "Message divisé en {{chunks}} fragments",
+    "no_messages_received": "Aucun message reçu",
+    "wallet_not_initialized": "Portefeuille non initialisé",
+    "missing_keys_ecdh": "Clés manquantes pour ECDH",
+    "recipient_pubkey_not_found": "Clé publique du destinataire introuvable. Le destinataire doit d'abord publier sa clé publique.",
+    "sender_pubkey_not_found": "Impossible de trouver la clé publique de l'expéditeur",
+    "insufficient_funds": "Fonds insuffisants",
+    "opreturn_data_too_large": "Données OP_RETURN trop volumineuses (max 75 octets)",
+    "enter_message": "Entrez un message",
+    "fill_all_fields": "Remplissez tous les champs",
+    "invalid_bech32_address": "Adresse bech32 invalide",
+    "message_too_long": "Message trop long : {{length}}/{{max}} caractères",
+    "invalid_private_key_ecdh": "Clé privée invalide pour ECDH",
+    "ecdh_derivation_error": "Erreur de dérivation de clé partagée : {{error}}",
+    "shared_key_derivation_error": "Erreur de dérivation de clé partagée",
+    "encryption_error": "Erreur de chiffrement : {{error}}",
+    "decryption_error_detail": "Erreur de déchiffrement : {{error}}",
+    "decryption_error": "Erreur de déchiffrement",
+    "no_recipient_address": "Aucune adresse de destinataire fournie",
+    "message_sent_success": "Message envoyé avec succès !",
+    "transactions": "transactions",
+    "unknown_sender": "Expéditeur inconnu",
+    "chunk_sent": "Fragment {{current}}/{{total}} envoyé : {{txid}}",
+    "chunk_abandoned": "Fragment {{chunk}} abandonné après {{attempts}} tentatives",
+    "sending_completed": "Envoi terminé : {{successful}}/{{total}} fragments réussis",
+    "confirmation_timeout": "Délai de confirmation dépassé"
+  },
+  
+  "confirmations": {
+    "checking_confirmation": "Vérification des confirmations...",
+    "confirmed": "Confirmé"
+  },
+  
+  "wallet": {
+    "email_wallet_connected": "Portefeuille email connecté avec succès ",
+    "email_connection_started": "Connexion email démarrée, génération du portefeuille...",
+    "email_wallet_generated": "Portefeuille email généré, calcul des soldes...",
+    "invalid_pubkey_conversion": "Clé publique invalide pour la conversion X-only",
+    "bitcoin_library_unavailable": "Bibliothèque Bitcoin indisponible",
+    "invalid_tweaked_key": "Clé privée ajustée invalide",
+    "tweaked_pubkey_error": "Échec du calcul de la clé publique ajustée",
+    "failed_to_create_taproot": "Échec de création de l'adresse Taproot",
+    "ecc_library_unavailable": "Bibliothèque ECC indisponible pour tweakSigner",
+    "invalid_seed_xprv": "Graine ou XPRV invalide",
+    "invalid_mnemonic": "Phrase mnémonique invalide",
+    "hd_wallet_import_failed": "Échec d'importation du portefeuille HD : {{error}}",
+    "hd_wallet_not_initialized": "Portefeuille HD non initialisé",
+    "hd_wallet_not_found": "Portefeuille HD introuvable",
+    "failed_to_derive_addresses": "Échec de dérivation des adresses : {{error}}",
+    "unknown_address_family": "Famille d'adresses inconnue : {{family}}",
+    "unsupported_input_format": "Format d'entrée non pris en charge",
+    "failed_to_generate_mnemonic": "Échec de génération de la phrase mnémonique",
+    "keymanager_not_initialized": "KeyManager non initialisé"
+  },
+  
+  "explorer": {
+    "primary_unavailable": "Explorateur principal indisponible, utilisation de l'explorateur de secours",
+    "checking_explorer": "Erreur lors de la vérification de l'explorateur :"
+  },
+  
+  "ui": {
+    "calculating": "Calcul en cours...",
+    "max_function_unavailable": "Fonction calculateMaxSendableAmount indisponible",
+    "max_calculation_error": "Erreur de calcul MAX : {{error}}",
+    "enter_destination_address": "Veuillez entrer une adresse de destination",
+    "invalid_amount": "Montant invalide",
+    "refresh_error": "Erreur d'actualisation : {{error}}"
+  },
+  
+  "progress_indicators": {
+    "initializing": "Initialisation...",
+    "preparing_utxos_percentage": "Préparation des UTXO : {{percentage}}%",
+    "preparing_missing_utxos": "Préparation de {{count}} UTXO...",
+    "utxos_ready": "UTXO prêts",
+    "broadcasting_chunks": "Diffusion {{current}}/{{total}}"
+  }
+}

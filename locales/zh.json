@@ -1,0 +1,282 @@
+{
+  "languages": {
+    "fr": "Français",
+    "en": "English",
+    "de": "Deutsch",
+    "es": "Español",
+    "nl": "Nederlands",
+    "ru": "Русский",
+    "zh": "中文"
+  },
+  
+  "title": "NITO Wallet",
+  "language_label": "语言：",
+  
+  "counter": {
+    "keys_generated": "🔑 已生成 Nito 密钥："
+  },
+  
+  "generate_section": {
+    "title": "🎯 生成 / 导入",
+    "generate_button": "🎲 生成",
+    "copy": "📋 复制",
+    "reveal": "👁️ 显示",
+    "warning": "⚠️ 请立即保存私钥！闲置10分钟或重新加载页面后将被清除。",
+    "hd_mnemonic_title": "HD 助记词种子 ）：",
+    "xprv_title": "XPRV HD 主密钥：",
+    "reveal_mnemonic": "显示助记词",
+    "reveal_xprv": "显示 XPRV"
+  },
+  
+  "import_section": {
+    "title": "📥 导入钱包",
+    "import_button": "📥 导入",
+    "refresh_button": "🔄 刷新",
+    "balance": "余额："
+  },
+  
+  "send_section": {
+    "title": "📤 发送 NITO",
+    "destination_placeholder": "收款地址",
+    "amount_placeholder": "数量 (NITO)",
+    "debit_label": "扣款地址：",
+    "bech32_option": "Bech32",
+    "prepare_button": "🔏 准备",
+    "broadcast_button": "✅ 广播交易",
+    "cancel_button": "❌ 取消",
+    "signed_tx": "已签名交易（十六进制）：",
+    "copy_tx": "📋 复制"
+  },
+  
+  "encrypted_messaging": {
+    "title": "🔐 加密消息",
+    "publish_pubkey": "📢 发布我的公钥",
+    "publish_info": "发布一次您的公钥，以便他人向您发送加密消息。",
+    "write_title": "✏️ 编写消息",
+    "message_placeholder": "您的消息（最多50000个字符）",
+    "send_button": "📤 发送",
+    "clear_button": "🗑️ 清除",
+    "read_title": "📬 读取消息",
+    "refresh_messages": "🔄 刷新消息",
+    "unread_messages": "未读消息",
+    "validate_button": "✅ 确认发送",
+    "cancel_button": "❌ 取消",
+    "recipient_placeholder": "收件人的 bech32 地址（nito1...）"
+  },
+  
+  "footer": {
+    "open_source": "此项目为开源项目",
+    "view_code": "在 GitHub 上查看代码",
+    "official_site": "NITO 官方网站"
+  },
+  
+  "max_button": {
+    "text": "最大值"
+  },
+  
+  "common": {
+    "cancel": "取消",
+    "close": "关闭",
+    "ok": "确定",
+    "confirm": "确认"
+  },
+  
+  "errors": {
+    "initialization_failed": "应用初始化失败。请刷新页面。",
+    "libraries_timeout": "库加载超时",
+    "libraries_failed": "比特币库初始化失败",
+    "missing_apis": "缺少必需的浏览器 API：{{apis}}",
+    "import_first": "请先导入钱包。",
+    "enter_key": "请输入私钥、助记词或 XPRV",
+    "import_failed": "导入失败",
+    "import_error": "导入错误",
+    "enter_email_password": "请输入邮箱和密码",
+    "connection_failed": "连接失败",
+    "connection_error": "连接错误",
+    "generation_failed": "生成错误",
+    "fill_destination_amount": "请填写目标地址和金额",
+    "transaction_functions_unavailable": "交易功能不可用",
+    "transaction_prep_failed": "交易准备失败",
+    "no_transaction": "没有要广播的交易",
+    "rpc_unavailable": "RPC 功能不可用",
+    "broadcast_failed": "广播失败",
+    "consolidation_unavailable": "合并功能不可用",
+    "error_details": "错误"
+  },
+  
+  "consolidate": {
+    "cta": "合并 UTXO"
+  },
+  
+  "loading": {
+    "wallet_setup": "正在设置钱包...",
+    "refreshing": "⛏ 正在刷新...",
+    "importing_wallet": "正在导入钱包...",
+    "connecting_email": "正在通过邮箱登录...",
+    "blockchain_scan": "正在扫描区块链...",
+    "cache_clearing": "正在清除缓存...",
+    "utxo_scan": "正在分析 UTXO...",
+    "balance_updated": "✅ 余额已更新！",
+    "update_error": "❌ 更新错误",
+    "calculating": "正在计算...",
+    "preparing_transaction": "正在准备交易...",
+    "broadcasting": "正在广播..."
+  },
+  
+  "popup": {
+    "success_message": "交易发送成功！",
+    "confirmation_progress": "确认进度：",
+    "transaction_id": "交易 ID：",
+    "close_button": "关闭",
+    "confirming": "正在确认...",
+    "ok_button": "确定"
+  },
+  
+  "system": {
+    "initialization_error_title": "初始化错误",
+    "reload_page": "重新加载页面",
+    "wallet_ready": "NITO 钱包已就绪，耗时 {{time}} 毫秒 - 版本 {{version}}"
+  },
+  
+  "transactions": {
+    "insufficient_funds_after_fees": "扣除手续费后资金不足",
+    "no_suitable_utxos": "没有可用的成熟 UTXO",
+    "need_at_least_utxos": "至少需要 {{count}} 个成熟的 UTXO 才能合并",
+    "consolidation_completed": "合并完成！\n{{original}} 个 UTXO → {{final}} 个 UTXO\n交易数：{{txCount}}\n类型：{{type}}",
+    "no_utxos_for_consolidation": "没有可用于合并的 UTXO",
+    "consolidation_error": "合并错误：{{error}}",
+    "consolidation_in_progress": "合并已在进行中。请稍候。",
+    "import_wallet_first": "请先导入钱包。",
+    "no_utxos_available": "没有可用的 UTXO",
+    "insufficient_funds_simple": "资金不足",
+    "need_at_least_two_utxos": "至少需要 2 个成熟的 UTXO 才能合并。找到：{{found}}",
+    "rpc_function_unavailable": "RPC 功能不可用",
+    "source_address_not_found": "未找到类型为 {{type}} 的源地址",
+    "failed_to_fetch_utxos": "获取 UTXO 失败",
+    "invalid_destination": "无效的目标地址",
+    "missing_keypair": "UTXO {{index}} 缺少密钥对",
+    "transaction_preparation_failed": "交易准备失败",
+    "consolidation_batch_skipped": "合并批次 {{batch}} 已跳过",
+    "consolidation_batch_failed": "合并批次 {{batch}} 失败：{{error}}"
+  },
+  
+  "security": {
+    "rate_limit_exceeded": "超出速率限制。请等待 {{seconds}} 秒后重试。",
+    "failed_to_encrypt": "加密敏感数据失败",
+    "failed_to_decrypt": "解密数据失败",
+    "element_not_found": "未找到元素",
+    "nothing_to_copy": "没有可复制的内容",
+    "please_reveal_first": "请先显示内容",
+    "copy_failed": "复制失败",
+    "copied": "已复制！",
+    "invalid_private_key": "无效的私钥",
+    "invalid_hex_format": "无效的十六进制格式 - 必须包含64个字符",
+    "private_key_32_bytes": "私钥必须为32字节",
+    "invalid_wif_format": "无效的 WIF 格式",
+    "session_expired_title": "会话已过期",
+    "auto_reload_message": "正在自动重新加载...",
+    "inactivity_detected": "检测到不活动",
+    "unknown_validation_type": "未知的验证类型：{{type}}",
+    "timer_arm_failed": "启动计时器失败",
+    "failed_to_derive_credentials": "派生凭证失败：{{error}}",
+    "empty_input": "提供的输入为空",
+    "invalid_email_format": "无效的邮箱格式",
+    "password_cannot_be_empty": "密码不能为空",
+    "encryption_not_initialized": "加密未初始化",
+    "invalid_data_type": "用于加密的数据类型无效",
+    "encryption_failed": "加密失败：{{error}}",
+    "invalid_encrypted_data": "无效的加密数据",
+    "decryption_failed": "解密失败：{{error}}"
+  },
+  
+  "messaging": {
+    "recipient_title": "📧 消息收件人",
+    "estimated_cost": "预计费用：0.0001 NITO（1笔交易）",
+    "searching_pubkey_for": "正在搜索公钥：",
+    "no_pubkey_found_for": "未找到公钥：",
+    "pubkey_found_validated_for": "已找到并验证公钥：",
+    "decryption_ecdh_completed": "ECDH 解密完成，消息已验证：",
+    "encryption_ecdh_for": "ECDH 加密：",
+    "analyzing_messages": "正在分析消息",
+    "encryption_successful": "消息已使用 ECDH + AES-GCM 加密",
+    "pubkey_published": "公钥已发布，交易ID：{{txid}}",
+    "publication_error": "发布错误：{{error}}",
+    "waiting_split_confirmation": "等待拆分确认...",
+    "message_sent_to": "消息已发送至：",
+    "message_divided": "消息已分为 {{chunks}} 个块",
+    "no_messages_received": "未收到消息",
+    "wallet_not_initialized": "钱包未初始化",
+    "missing_keys_ecdh": "ECDH 缺少密钥",
+    "recipient_pubkey_not_found": "未找到收件人的公钥。收件人必须先发布其公钥。",
+    "sender_pubkey_not_found": "找不到发件人的公钥",
+    "insufficient_funds": "资金不足",
+    "opreturn_data_too_large": "OP_RETURN 数据过大（最大75字节）",
+    "enter_message": "输入消息",
+    "fill_all_fields": "填写所有字段",
+    "invalid_bech32_address": "无效的 bech32 地址",
+    "message_too_long": "消息过长：{{length}}/{{max}} 个字符",
+    "invalid_private_key_ecdh": "用于 ECDH 的私钥无效",
+    "ecdh_derivation_error": "共享密钥派生错误：{{error}}",
+    "shared_key_derivation_error": "共享密钥派生错误",
+    "encryption_error": "加密错误：{{error}}",
+    "decryption_error_detail": "解密错误：{{error}}",
+    "decryption_error": "解密错误",
+    "no_recipient_address": "未提供收件人地址",
+    "message_sent_success": "消息发送成功！",
+    "transactions": "交易",
+    "unknown_sender": "未知发件人",
+    "chunk_sent": "块 {{current}}/{{total}} 已发送：{{txid}}",
+    "chunk_abandoned": "块 {{chunk}} 在 {{attempts}} 次尝试后已放弃",
+    "sending_completed": "发送完成：{{successful}}/{{total}} 个块成功",
+    "confirmation_timeout": "确认超时"
+  },
+  
+  "confirmations": {
+    "checking_confirmation": "正在检查确认...",
+    "confirmed": "已确认"
+  },
+  
+  "wallet": {
+    "email_wallet_connected": "邮箱钱包连接成功 ）",
+    "email_connection_started": "邮箱登录已开始，正在生成钱包...",
+    "email_wallet_generated": "邮箱钱包已生成，正在计算余额...",
+    "invalid_pubkey_conversion": "X-only 转换的公钥无效",
+    "bitcoin_library_unavailable": "比特币库不可用",
+    "invalid_tweaked_key": "无效的调整私钥",
+    "tweaked_pubkey_error": "计算调整公钥失败",
+    "failed_to_create_taproot": "创建 Taproot 地址失败",
+    "ecc_library_unavailable": "tweakSigner 的 ECC 库不可用",
+    "invalid_seed_xprv": "无效的种子或 XPRV",
+    "invalid_mnemonic": "无效的助记词",
+    "hd_wallet_import_failed": "HD 钱包导入失败：{{error}}",
+    "hd_wallet_not_initialized": "HD 钱包未初始化",
+    "hd_wallet_not_found": "未找到 HD 钱包",
+    "failed_to_derive_addresses": "派生地址失败：{{error}}",
+    "unknown_address_family": "未知的地址族：{{family}}",
+    "unsupported_input_format": "不支持的输入格式",
+    "failed_to_generate_mnemonic": "生成助记词失败",
+    "keymanager_not_initialized": "KeyManager 未初始化"
+  },
+  
+  "explorer": {
+    "primary_unavailable": "主浏览器不可用，正在使用备用浏览器",
+    "checking_explorer": "检查浏览器时出错："
+  },
+  
+  "ui": {
+    "calculating": "正在计算...",
+    "max_function_unavailable": "函数 calculateMaxSendableAmount 不可用",
+    "max_calculation_error": "最大值计算错误：{{error}}",
+    "enter_destination_address": "请输入目标地址",
+    "invalid_amount": "无效的金额",
+    "refresh_error": "刷新错误：{{error}}"
+  },
+  
+  "progress_indicators": {
+    "initializing": "正在初始化...",
+    "preparing_utxos_percentage": "正在准备 UTXO：{{percentage}}%",
+    "preparing_missing_utxos": "正在准备 {{count}} 个 UTXO...",
+    "utxos_ready": "UTXO 已准备好",
+    "broadcasting_chunks": "正在广播 {{current}}/{{total}}"
+  }
+}
