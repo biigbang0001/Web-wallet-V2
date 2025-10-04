@@ -1,6 +1,7 @@
 var/www/wallet-nito-test/
 ├── index.html
 ├── nito.png
+├── packkage-lock.json
 ├── locales/
 │   ├── fr.json
 │   ├── en.json
@@ -23,6 +24,8 @@ var/www/wallet-nito-test/
 │   ├── messaging.js
 │   ├── ui-popups.js
 │   └── ui-handlers.js
+├── dist/
+│   └── vendor-bundle.min.js
 ├── api/
 │   └── get-counter.php
 └── data/
@@ -35,4 +38,5 @@ var/www/wallet-nito-test/
 Allow the key counter php script to write:
  
 sudo chown -R www-data:www-data /var/www/wallet-nito-test/data
+
 sudo chmod 600 /var/www/wallet-nito-test/data/counter.txt
